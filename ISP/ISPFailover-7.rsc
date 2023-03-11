@@ -1,6 +1,7 @@
 # ISPFailover 
-# ver 0.71 / 7.x
-# modified 2023/01/17
+# ver 0.80 / 7.x
+# Add resolver for hosts
+# modified 2023/01/18
 :global ispInf ether1;
 :global lteInf lte1;
 :global ispFailCnt;
@@ -11,14 +12,15 @@
 # yandex.ru, cloudflare, GoogleDNS, mail.ru
 # :local pingHost {87.250.250.242; 1.1.1.1; 8.8.8.8; 94.100.180.200};
 # :local pingHostWake 8.8.8.8; 
-#-- yandex.ru, google.com, mail.ru
-:local pingHost {87.250.250.242; 64.233.164.101; 94.100.180.200};
+:local pingHost {"yandex.ru"; "google.com"; "mail.ru"};
 :local ispInetOk false;
 :local lteInetOk false;
 :local ispPing 0;
 :local ltePing 0;
 :local failTreshold 3;
 :local lteGateDist;
+
+:global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
 
 :global Ping do={
     :local pingAddress $1;
@@ -98,7 +100,7 @@
 :put "lteGateDist=$lteGateDist";
 # Check ISP ping
 :foreach k in=$pingHost do={
-    :local res [$Ping $k count=$pingCount interface=$ispInf];
+    :local res [$Ping [$Resolve $k] count=$pingCount interface=$ispInf];
     :set ispPing ($ispPing + $res);
 }
 :set ispInetOk ($ispPing > 0);
@@ -130,7 +132,7 @@ if ($ispInetOk) do={
                 # /ping $pingHostWake count=$pingCount interface=$lteInf;
                 # delay 3s;
                 foreach k in=$pingHost do={
-                    :local res [$Ping $k count=$pingCount interface=$lteInf];
+                    :local res [$Ping [$Resolve $k] count=$pingCount interface=$lteInf];
                     :set ltePing ($ltePing + $res);
                 }
                 :set lteInetOk ($ltePing > 0)
@@ -150,7 +152,7 @@ if ($ispInetOk) do={
             # /ping $pingHostWake count=$pingCount interface=$lteInf;
             # :delay 3s;
             :foreach k in=$pingHost do={
-                :local res [$Ping $k count=$pingCount interface=$lteInf]
+                :local res [$Ping [$Resolve $k] count=$pingCount interface=$lteInf]
                 :set ltePing ($ltePing + $res);
             }
             :set lteInetOk ($ltePing > 0);
