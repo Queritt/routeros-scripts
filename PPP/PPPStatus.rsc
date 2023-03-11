@@ -1,7 +1,11 @@
 # PPP client management
-# ver 0.24
-# modified 2022/08/24
-
+# ver 0.25
+# modified 2022/09/07
+#---Function of sending message to telegram bot
+:local SendMsg do={
+    :local  nameID [ /system identity get name; ];
+    [[:parse [/system script get TG source]] Text=("$nameID:"."%0A"."$1")];
+}
 #---Function of showing information about available commands
 :local Help do={
     :local help ("PPP options: "."%0A". \
@@ -10,15 +14,8 @@
         " > set/add [nat; name; \"80/445/udp\"]"."%0A". \
         " > set [pass; name; 8-24 characters]"."%0A". \
         " > enable/disable/remove [netwatch/nat; name]");
-    [[:parse [/system script get TG source]] Text=$help];
+    :return $help;
 }
-
-#---Function of sending message to telegram bot
-:local SendMsg do={
-    :local  nameID [ /system identity get name; ];
-    [[:parse [/system script get TG source]] Text=("$nameID:"."%0A"."$1")];
-}
-
 #---Function of renaming PPP-client coment
 :local Rename do={
     :local notAccessList {"PDA"; "PPP-OUT-2"; "WM"; "RDP"; "Reserved"; "OVPN"; "SSTP"}
@@ -51,7 +48,6 @@
         :return ("$clientName".": "."\"$oldName\""." to "."\"$newName\""." successfully renamed.");
     } else={ :return "PPP print error: \"$oldName\" not found! Try again..."; }
 }
-
 #---Function of printing PPP-client information
 :local Print do={
     :local notAccessList {"PDA"; "PPP-OUT-2"; "WM"; "RDP"; "Reserved"; "OVPN"; "SSTP"};
@@ -65,7 +61,6 @@
     :if ($nameClient = "all" || $nameClient = "ALL") do={ 
         :set clientPPP [/ppp secret find]; 
     } else={ :set clientPPP [ /ppp secret find (comment ~"$nameClient") ]; }
-
     if ([:len $clientPPP] > 0) do={
         :for i from=0 to=([:len $clientPPP] - 1) do={
             :set tempName [ /ppp secret get [:pick $clientPPP ($i)] name; ];
@@ -124,7 +119,6 @@
         :return $tempString;
     } else={ :return "PPP print error: \"$nameClient\" not found! Try again..."; }
 }
-
 #---Function of Enabling Disabling Removing PPP-client information
 :local EnableDisableRemove do={
     :local action $1;
@@ -148,7 +142,6 @@
         :return "Edit error: \"$target\" not recognized! Try again..."; 
     } else={ :return "Edit error: client \"$nameClient\" not found! Try again..."; }
 }
-
 #---Function of setting NAT
 :local SetAdd do={
     :local action $1;
@@ -213,34 +206,30 @@
     }
     :return "Set error: option \"$target\" or port not recognized! Try again..."; 
 }
-
 #---MAIN---#
-#---Help
-:if ($0 = null || $1 = null) do={ $Help; :return; }
 #---Print
-:if ($0 = "print") do={ $SendMsg [ $Print $1 $2 $3 $4 $5 $6 ]; :return []; } 
+:if ($0 = "print") do={
+    :if ($1 != null) do={
+        $SendMsg [ $Print $1 $2 $3 $4 $5 $6 ]; return [];
+    } else={ $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; } 
+} 
 #---Rename
 :if ($0 = "rename") do={
     :if ($2 != null) do={
         $SendMsg [ $Rename $1 $2 ]; return [];
-    } else={
-        $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return [];
-    } 
+    } else={ $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; } 
 } 
 #---Enable, disable, remove
 :if ($0 = "enable" || $0 = "disable" || $0 = "remove") do={
     :if ($2 != null) do={ 
         $SendMsg [ $EnableDisableRemove $0 $1 $2 ]; return [];
-    } else={
-        $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; 
-    } 
+    } else={ $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; } 
 } 
-#---Set
+#---Set, Add
 :if ($0 = "set" || $0 = "add") do={
     :if ($2 != null) do={ 
         $SendMsg [ $SetAdd $0 $1 $2 $3 ]; return [];
-    } else={
-        $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; 
-    } 
+    } else={ $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; } 
 } 
-$SendMsg "PPP error: unknown option. Try again...";
+#---Help
+$SendMsg [$Help];
