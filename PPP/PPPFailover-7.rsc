@@ -1,7 +1,7 @@
 ## PPPFailover
-## 0.75 / 7.x
-## 2023/02/05
-## Changed the log output message
+## 0.81 / 7.x
+## 2023/03/04
+## RenewList fills into every server changing.
 ## Changing server from file
 ## File in flash and contains name as "providerName" value
 
@@ -68,7 +68,6 @@
     :local preferList $4;
     :local oneListClient $5;
     :local renewList $6;
-    :local renewStatus $7;
     :local existAddress ({});
     :global main1Renew;
     :global main2Renew;
@@ -77,10 +76,6 @@
     :local country "";
     :local city "";
     :local suiteStatus false;
-    #---Auto-Reset for renew list if host failed
-    :if ( (!$renewStatus) && ([:len $renewList] !=0) ) do={ 
-        :if ($clientComment = "main1") do={ :set $main1Renew ({}); } else={:set $main2Renew ({}); };
-    }
     :foreach i in=[/interface l2tp-client find (comment ~"$providerName")] do={
         :set existAddress ($existAddress, [/interface l2tp-client get $i connect-to]);
     }
@@ -97,11 +92,9 @@
             :if ($suiteStatus) do={
                 :local tempComment ($clientComment . "-" . $providerName . "-" . $country . ", " . $city);
                 /interface l2tp-client set $clientName connect-to=$address comment=$tempComment;
-                :if ( $renewStatus ) do={ 
-                    :if ($clientComment = "main1") do={ 
-                        :set $main1Renew ( $main1Renew, "$address"); 
-                    } else={ :set $main2Renew ( $main2Renew, "$address" ); }
-                } 
+                :if ($clientComment = "main1") do={ 
+                    :set $main1Renew ( $main1Renew, "$address"); 
+                } else={ :set $main2Renew ( $main2Renew, "$address" ); }
                 :return ("PPP-OUT-$clientComment DOWN. Host changed: " . "\"$country, $city\"");
             }
         }
@@ -118,15 +111,17 @@
             :if ($suiteStatus) do={
                 :local tempComment ($clientComment . "-" . $providerName . "-" . $country . ", " . $city);
                 /interface l2tp-client set $clientName connect-to=$address comment=$tempComment;
-                :if ( $renewStatus) do={ 
-                    :if ($clientComment = "main1") do={ 
-                        :set $main1Renew ( $main1Renew, "$address"); 
-                    } else={ :set $main2Renew ( $main2Renew, "$address" ); }
-                } 
+                :if ($clientComment = "main1") do={ 
+                    :set $main1Renew ( $main1Renew, "$address"); 
+                } else={ :set $main2Renew ( $main2Renew, "$address" ); }
                 :return ("PPP-OUT-$clientComment DOWN. Prefer not found, host changed: " . "\"$country, $city\"");
             }
         }
-    } else={ :return "PPP-OUT-$clientComment DOWN. Prefer host not found!" };
+    } else={ 
+        :if ($clientComment = "main1") do={ :set $main1Renew ({}); } else={:set $main2Renew ({}); };
+        :return "PPP-OUT-$clientComment DOWN. Prefer host not found!" 
+    };
+    :if ($clientComment = "main1") do={ :set $main1Renew ({}); } else={:set $main2Renew ({}); };
     :return "PPP-OUT-$clientComment DOWN. Working or prefer host not found!";
 }
 #--MAIN
@@ -161,10 +156,10 @@
 
 :if ($action = "renew") do={
     :if ($renewInf = "main1") do={
-        /log warning ("Renew: ".[$ChangeServer $providerName $main1Inf "main1" $main1InfPreferList $InfOneList $main1Renew $renewCheck]); return [];
+        /log warning ("Renew: ".[$ChangeServer $providerName $main1Inf "main1" $main1InfPreferList $InfOneList $main1Renew]); return [];
     }
     :if ($renewInf = "main2") do={
-        /log warning ("Renew: ".[$ChangeServer $providerName $main2Inf "main2" $main2InfPreferList $InfOneList $main2Renew $renewCheck]); return [];
+        /log warning ("Renew: ".[$ChangeServer $providerName $main2Inf "main2" $main2InfPreferList $InfOneList $main2Renew]); return [];
     }
     $SendMsg [$Help]; :return [];
 }
@@ -178,14 +173,14 @@
     :delay 5s;
     ## Out-1 ping Step-2
     :if ([$HostPing host=$pingHost count=1 interface=$main1Inf] = 0) do={
-        /log info [$ChangeServer $providerName $main1Inf "main1" $main1InfPreferList $InfOneList $main1Renew $renewCheck];
-    };
-}
+        /log info [$ChangeServer $providerName $main1Inf "main1" $main1InfPreferList $InfOneList $main1Renew];
+    } else={:if ([:len $main1Renew] > 3) do={:set $main1Renew ({});}};
+} else={:if ([:len $main1Renew] > 3) do={:set $main1Renew ({});}};
 ## Out-2 ping Step-1
 :if ([$HostPing host=$pingHost count=1 interface=$main2Inf] = 0) do={
     :delay 5s;
     ## Out-2 ping Step-2
     :if ([$HostPing host=$pingHost count=1 interface=$main2Inf] = 0) do={
-        /log info [$ChangeServer $providerName $main2Inf "main2" $main2InfPreferList $InfOneList $main2Renew $renewCheck];
-    };
-}
+        /log info [$ChangeServer $providerName $main2Inf "main2" $main2InfPreferList $InfOneList $main2Renew];
+    } else={:if ([:len $main2Renew] > 3) do={:set $main2Renew ({});}};
+} else={:if ([:len $main2Renew] > 3) do={:set $main2Renew ({});}};
