@@ -1,7 +1,10 @@
-# PPP Failover by list
-# 0.5 / 7.x
-# 2023/01/17
+# PPPFailover
+# 0.61 / 7.x
+# Add global value for ping host
+# 2023/01/20
 #--Changing server
+
+:global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
 
 :global Ping do={
     :local pingAddress $1;
@@ -92,16 +95,15 @@
 :local main1InfPing 0;
 :local main2InfPing 0;
 #--Provider link
-#--yandex.ru, google.com, mail.ru
-:local pingHost {87.250.250.242; 64.233.164.101; 94.100.180.200};
+:global pingHost {"yandex.ru"; "google.com"; "mail.ru"};
 :local ispPing 0;
-:foreach host in=$pingHost do={ :local res [$Ping $host count=1]; :set ispPing ($ispPing + $res); };
+:foreach host in=$pingHost do={ :local res [$Ping [$Resolve $host] count=1]; :set ispPing ($ispPing + $res); };
 :if ($ispPing = 0) do={ :return [] };
 #--Client link
 foreach host in=$pingHost do={
-    :local res [$Ping $host count=1 interface=$main1Inf];
+    :local res [$Ping [$Resolve $host] count=1 interface=$main1Inf];
     :set main1InfPing ($main1InfPing + $res);
-    :local res [$Ping $host count=1 interface=$main2Inf];
+    :local res [$Ping [$Resolve $host] count=1 interface=$main2Inf];
     :set main2InfPing ($main2InfPing + $res);
 }
 :if ($main1InfPing = 0) do={
