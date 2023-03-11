@@ -1,6 +1,6 @@
 ## Wlan
 ## 2023/03/10
-## 0.10
+## 0.20
 
 :local SendMsg do={
     :local nameID [/system identity get name;];
@@ -8,8 +8,16 @@
 }
 
 :local Help do={
-    :local help (" Wlan option: "."%0A". \
-        " > print")
+    :local help ("Wlan option: "."%0A". \
+        " > print:"."%0A". \
+        "     reg"."%0A". \
+        "     guest [pass; limit]"."%0A". \
+        "     netwatch"."%0A". \
+        " > set:"."%0A". \
+        "     guest pass [gen; manual]"."%0A". \
+        "     guest limit [0-90]"."%0A". \
+        " > enable/disable:"."%0A". \
+        "     netwatch [client name]");
     :return $help;
 }
 
@@ -51,25 +59,118 @@
         :return ($convStr);
     }
 
-    :local startBuf [:toarray [/interface wireless registration-table find]];
-    :if ([:len $startBuf] = 0) do={:return " Wlan: registered clients not found."};
-    :local inf;
-    :local comment;
-    :local uptime; 
-    :local signal;
-    :local outMsg " Wlan registered:\n";
-    :foreach n in=$startBuf do={
-        :set inf [/interface wireless registration-table get $n interface];
-        :set comment [/interface wireless registration-table get $n comment];
-        :set uptime [/interface wireless registration-table get $n uptime];
-        :set signal [/interface wireless registration-table get $n signal-strength];
-        :set outMsg ($outMsg." > ".$inf." / ".$comment." / ".$uptime." / ".$signal."\n");       
-    };
-    :set outMsg [$CP1251toUTF8 $outMsg];
-    :return $outMsg;
+    :local action $2;
+
+    :do {
+        :if ($1 = "guest") do={
+            :if ($action = "pass") do={
+                :local guestPass [/interface wireless security-profiles get Guest wpa2-pre-shared-key];
+                :return (" Wlan Guest pass: ". $guestPass);
+            }
+            :if ($action = "limit") do={
+                :local guestLimit ([/interface wireless access-list get [find comment="wlan1-Guest"] ap-tx-limit] / 1000000);
+                :return (" Wlan Guest limit: ".$guestLimit."M.");
+            }
+            :return (" Wlan Guest print option not recognized.");
+        }
+
+        :if ($1 = "reg") do={
+        :local startBuf [:toarray [/interface wireless registration-table find]];
+        :if ([:len $startBuf] = 0) do={:return " Wlan registered clients not found."};
+        :local inf;
+        :local comment;
+        :local uptime; 
+        :local signal;
+        :local outMsg " Wlan registered:\n";
+        :foreach n in=$startBuf do={
+            :set inf [/interface wireless registration-table get $n interface];
+            :set comment [/interface wireless registration-table get $n comment];
+            :set uptime [/interface wireless registration-table get $n uptime];
+            :set signal [/interface wireless registration-table get $n signal-strength];
+            :set outMsg ($outMsg." > ".$inf." / ".$comment." / ".$uptime." / ".$signal."\n");       
+        };
+        :set outMsg [$CP1251toUTF8 $outMsg];
+        :return $outMsg;
+        }
+
+        :if ($1 = "netwatch") do={
+            :local startBuf [/tool netwatch find comment~"Wlan"];
+            :if ([:len $startBuf] = 0) do={:return (" Wlan netwatch client not found.");};
+            :local clientComment;
+            :local clientStatus;
+            :local outMsg " Wlan netwatch:\n";
+            :foreach n in=$startBuf do={
+                :set clientComment [/tool netwatch get $n comment];
+                :set clientStatus [:tobool [/tool netwatch find comment="$clientComment" disabled=no]];
+                :if ($clientStatus) do={:set $clientStatus "enabled"} else={:set $clientStatus "disabled"};
+                :set outMsg ($outMsg." > ".$clientComment." / ".$clientStatus."\n");
+            }
+            :set outMsg [$CP1251toUTF8 $outMsg];
+            :return $outMsg;
+        }
+        :return (" Wlan print action not recognized.");
+    } on-error={:return (" Wlan print: something went wrong.");}
+}
+
+:local SetWlan do={
+    :do {
+        :if ($1 = "guest") do={
+            :local action $2;
+            :local option $3;
+            :if ($action = "pass") do={
+                :if ($option = "gen") do={
+                    :local newPass [[:parse [/system script get Password source]] 8 1];
+                    /interface wireless security-profiles set Guest wpa2-pre-shared-key=$newPass;
+                    :return (" Wlan Guest new pass: ". $newPass);
+                } else={
+                    :if ([:len $option] > 7) do={
+                        /interface wireless security-profiles set Guest wpa2-pre-shared-key=$option;
+                        :return (" Wlan Guest new pass: ". $option);
+                    } else={ :return (" Wlan pass \"$option\"" . " less than 8 characters. Try againg..."); };
+                }
+            }
+            :if ($action = "limit") do={
+                :do {
+                    :if ($option = null || $option > 90) do={:set option 10M} else={ :set option ($option . "M"); };
+                    :foreach i in=[/interface wireless access-list find (comment ~"Guest")] do={
+                        /interface wireless access-list set $i ap-tx-limit=$option;
+                    }; 
+                    :return (" Wlan Guest download limit changed to " . "\"$option\".");
+                } on-error={ :return (" Wlan Guest limit error: " . "\"$option\"" . " not correct! Try again..."); }
+            }
+            :return (" Wlan Guest set option not recognized.");
+        }
+        :return (" Wlan set action not recognized.");
+    } on-error={:return (" Wlan set: something went wrong.");}
+}
+
+:local EnableAndDisableWlan do={
+    :local action $1;
+    :local option $2;
+    :local clientName $3;
+    :if ($option = "netwatch") do={
+        :local clientId [/tool netwatch find comment~"$clientName"];
+        :if ([:len $clientId] = 0) do={:return (" Wlan: netwatch client \"$clientName\" not found.");}
+        :local clientComment [/tool netwatch get $clientId comment];
+        :if ($action = "enable") do={
+            :if ( [/tool netwatch find comment="$clientComment" disabled=yes] ) do={
+                [/tool netwatch enable $clientId];
+                :return (" Wlan netwatch \"$clientComment\" enabled.");
+            } else={:return (" Wlan netwatch \"$clientComment\" already enabled.")};
+        }
+        :if ($action = "disable") do={
+            :if ( [/tool netwatch find comment="$clientComment" disabled=no] ) do={
+                [/tool netwatch disable $clientId];
+                :return (" Wlan netwatch \"$clientComment\" disabled.");
+            } else={:return (" Wlan netwatch \"$clientComment\" already disabled.")};
+        }
+    }
+    :return (" Wlan enable or disable action not recognized.");
 }
 
 :local action $0;
-:if ($action = "help" || $action = "Help") do={$SendMsg [$Help]; :return [];};
-:if ($action = "print") do={$SendMsg [$PrintWlan]; :return [];};
+:if ($action~"help|Help") do={$SendMsg [$Help]; :return [];};
+:if ($action="print") do={$SendMsg [$PrintWlan $1 $2]; :return [];};
+:if ($action="set") do={$SendMsg [$SetWlan $1 $2 $3]; :return [];};
+:if ($action="enable" or $action="disable") do={$SendMsg [$EnableAndDisableWlan $0 $1 $2]; :return [];};
 $SendMsg [$Help];
