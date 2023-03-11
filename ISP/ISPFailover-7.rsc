@@ -1,6 +1,6 @@
 # ISPFailover 
-# ver 0.70 / 7.x
-# modified 2023/01/16
+# ver 0.71 / 7.x
+# modified 2023/01/17
 :global ispInf ether1;
 :global lteInf lte1;
 :global ispFailCnt;
@@ -9,8 +9,10 @@
 :local lteInfOk [/interface find name=lte1];
 :local pingCount 1;
 # yandex.ru, cloudflare, GoogleDNS, mail.ru
-:local pingHost {87.250.250.242; 1.1.1.1; 8.8.8.8; 94.100.180.200};
+# :local pingHost {87.250.250.242; 1.1.1.1; 8.8.8.8; 94.100.180.200};
 # :local pingHostWake 8.8.8.8; 
+#-- yandex.ru, google.com, mail.ru
+:local pingHost {87.250.250.242; 64.233.164.101; 94.100.180.200};
 :local ispInetOk false;
 :local lteInetOk false;
 :local ispPing 0;
@@ -99,7 +101,7 @@
     :local res [$Ping $k count=$pingCount interface=$ispInf];
     :set ispPing ($ispPing + $res);
 }
-:set ispInetOk ($ispPing >= 3);
+:set ispInetOk ($ispPing > 0);
 :put "ispInetOk=$ispInetOk";
 if ($ispInetOk) do={
     :if ($ispFailCnt > 0) do={
@@ -131,7 +133,7 @@ if ($ispInetOk) do={
                     :local res [$Ping $k count=$pingCount interface=$lteInf];
                     :set ltePing ($ltePing + $res);
                 }
-                :set lteInetOk ($ltePing >= 3)
+                :set lteInetOk ($ltePing > 0)
                 :put "lteInetOk=$lteInetOk";
                 :if ($lteInetOk && ($lteGateDist = 4)) do={
                     $SwitchToLTE;
@@ -151,7 +153,7 @@ if ($ispInetOk) do={
                 :local res [$Ping $k count=$pingCount interface=$lteInf]
                 :set ltePing ($ltePing + $res);
             }
-            :set lteInetOk ($ltePing >= 3);
+            :set lteInetOk ($ltePing > 0);
             :put "lteInetOk=$lteInetOk";
             if ($lteInetOk) do={
                 $SwitchToLTE;
