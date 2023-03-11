@@ -1,21 +1,18 @@
 # Firewall
-# ver 0.2
-# modified 2022/08/18
-
-#---Function of showing information about available commands
-:local Help do={
-    :local help ("Firewall options: "."%0A". \
-    " > list add [ip/address]"."%0A". \
-    " > list enable/disable [comment]");
-    [[:parse [/system script get TG source]] Text=$help];
-}
-
+# ver 0.3
+# modified 2022/09/07
 #---Function of sending message to telegram bot
 :local SendMsg do={
     :local  nameID [ /system identity get name; ];
     [[:parse [/system script get TG source]] Text=("$nameID:"."%0A"."$1")];
 }
-
+#---Function of showing information about available commands
+:local Help do={
+    :local help ("Firewall options: "."%0A". \
+    " > list add [ip/address]"."%0A". \
+    " > list enable/disable [comment]");
+    :return $help;
+}
 #---Address-list function
 :local AddressList do={
     :local action $1;
@@ -34,15 +31,12 @@
         } on-error={ :return "Address-list $action error: \"$address\" is wrong! Try again..."; }  
     }
 }
-
-:if ($0 = null || $0 = "help" || $0 = "Help") do={ $Help; :return; }
-
-#---add
+#---MAIN
+#---List
 :if ($0 = "list") do={
-    :if ($1 != null) do={ 
+    :if ($2 != null) do={ 
         $SendMsg [ $AddressList $1 $2 ]; return [];
-    } else={
-        $SendMsg ("Firewall $0 error: not enough arguments. Try again..."); :return []; 
-    } 
+    } else={ $SendMsg ("Firewall $0 error: not enough arguments. Try again..."); :return []; } 
 } 
-$SendMsg "Firewall error: unknown option. Try again...";
+#---Help
+$SendMsg [$Help];
