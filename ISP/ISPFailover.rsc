@@ -1,7 +1,7 @@
 # ispFailover 
 # BGP edition
-# ver 0.40
-# modified 2022/10/23
+# ver 0.50
+# modified 2022/11/25
 :global ispInf ether1;
 :global lteInf lte1;
 :global ispFailCnt;
@@ -22,16 +22,14 @@
 :local lteGateDist;
 
 :local SwitchToISP do={
-    /queue tree disable [find comment="LTE"];
-    /queue tree enable [find comment="ISP-100"];
     #/ ip firewall connection remove [find];
     # /ip route set [find comment="LTE"] distance=4;
     /ip route set $lteId distance=4;
+    /queue tree disable [find comment="LTE"];
+    /queue tree enable [find comment="ISP-100"];
     /ip firewall raw disable [find comment="WEB-LTE"]; 
     /interface disable l2tp-out1;
     /interface disable l2tp-out2;
-    # /interface disable l2tp-out3;
-    # /interface disable l2tp-out4;
     # /interface disable l2tp-out5;
     :delay 2s;
     /interface enable l2tp-out1;
@@ -43,12 +41,12 @@
 
 :local SwitchToLTE do={
     :delay 1s; 
+    # /ip route set [find comment="LTE"] distance=1;
+    /ip route set $lteId distance=1;
     /queue tree disable [find comment="ISP-100"];
     /queue tree enable [find comment="LTE"];
     #/ ip firewall connection remove [find];
     /ip firewall raw enable [find comment="WEB-LTE"]; 
-    # /ip route set [find comment="LTE"] distance=1;
-    /ip route set $lteId distance=1;
     /interface disable [find name="l2tp-out1"];
     /interface disable [find name="l2tp-out2"];
     # /interface disable [find name="l2tp-out5"];
