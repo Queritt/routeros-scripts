@@ -1,6 +1,6 @@
 # WG peer management
-# ver 0.1
-# modified 2022/10/14
+# ver 0.11
+# modified 2022/10/19
 #---Function of sending message to telegram bot
 :local SendMsg do={
     :local  nameID [ /system identity get name; ];
@@ -27,11 +27,18 @@
     }
     if ([:len $clientWG] > 0) do={
         :if ($newName = "nouse") do={
-            :local tempAddress [ /interface wireguard peers get $clientWG allowed-address; ];
-            :set tempAddress [:tostr [:pick $tempAddress 0]];
-            :set newName ("Test-".[:pick $tempAddress 0 [:find $tempAddress "/" -1]]); 
+           :local startLoc;
+           :local endLoc;
+           :local tempAddress [ /interface wireguard peers get $clientWG allowed-address; ];
+           :set tempAddress [:tostr [:pick $tempAddress 0]];
+           :set endLoc [:find $tempAddress "/" -1];
+           :if ( [ :pick $tempAddress ($endLoc -1) ] ~"[0-9]" ) do={ :set startLoc ($endLoc -1) };
+           :if ( [ :pick $tempAddress ($endLoc -2) ] ~"[0-9]" ) do={ :set startLoc ($endLoc -2) };
+           :if ( [ :pick $tempAddress ($endLoc -3) ] ~"[0-9]" ) do={ :set startLoc ($endLoc -3) };
+           :set newName ("test-".[:pick $tempAddress $startLoc $endLoc]); 
         }
-        #---change secret
+        #---change peer comment 
+    	:if ( $oldName = $newName ) do={ :return ("WG rename error: old and new name not diferent!"); }
         /interface wireguard peers set $clientWG comment=$newName;
         #---change netwatch
         :if [/tool netwatch find comment=$oldName] do={
@@ -64,7 +71,7 @@
             :set tempComment [ /interface wireguard peers get [:pick $clientWG ($i)] comment; ];
             :set tempAddress [ /interface wireguard peers get [:pick $clientWG ($i)] allowed-address; ];
             :set tempString  ("$tempString"."$tempComment".":"."%0A"." > addr: "."$tempAddress"."%0A");
-            #---LAST-HANDSHAKE
+            #---Last handshake
             :if ($2 = "time" || $3 = "time" || $4 = "time" || $5 = "time" || $6 = "time") do={
                 :set tempArgument [/interface wireguard peers get [:pick $clientWG ($i)] last-handshake; ];
                 :if ( [:len $tempArgument] = 0) do={ :set tempArgument "00:00:00"}
@@ -87,7 +94,7 @@
                 } else={ :set tempArgument "denied"; }
                 :set tempString ("$tempString"." > key: "."$tempArgument"."%0A");
             } 
-            #---LAST-CALLER-ID
+            #---Last Caller
             :if ($2 = "call" || $3 = "call" || $4 = "call" || $5 = "call" || $6 = "call") do={
                 :set tempArgument [/interface wireguard peers get [:pick $clientWG ($i)] current-endpoint-address;]
                 :if ( [:len $tempArgument] = 0 ) do={ :set tempArgument "inactive";}
@@ -107,7 +114,6 @@
             }
             #---NAT
             :if ($2 = "nat" || $3 = "nat" || $4 = "nat" || $5 = "nat" || $6 = "nat") do={
-            # :if ($1 = "nat" || $2 = "nat" || $3 = "nat" || $4 = "nat" || $5 = "nat") do={
                 :if ( [ /ip firewall nat find comment="$tempComment"; ] ) do={
                     :local port [ /ip firewall nat get [find comment="$tempComment"] dst-port; ]
                     :if ( [ /ip firewall nat find comment="$tempComment" disabled=no; ] ) do={
