@@ -1,14 +1,14 @@
-# ISP Status
-# 0.4 / 7.x
-# Add resolver for hosts
-# 2023/01/18
+## ISP Status
+## 0.42 / 7.x
+## 2023/02/04
+## Changed func Ping
 :global ispInf ether1
 :global lteInf lte1
 :local pingHostCnt 1
 :local pingGateCnt 3
 # yandex.ru, OpenDNS, GoogleDNS, mail.ru
 # :local pingHost {87.250.250.242; 208.67.222.222; 8.8.8.8; 94.100.180.200};
-:local pingHost {"yandex.ru"; "google.com"; "mail.ru"};
+:global pingHost {"yandex.ru"; "google.com"; "mail.ru"};
 # :local pingHostWake 8.8.8.8; 
 :local pingISPGate IP;
 :local pingLTEGate 192.168.8.1;
@@ -24,17 +24,11 @@
 :global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
 
 :global Ping do={
-    :local pingAddress $1;
-    :local pingCount $count;
-    :local pingInf $interface;
+    ## Value required: $1(address); count; [interface]
     :local res 0;
-    :for i from=1 to=$pingCount step=1 do={
-        :if ( [:len $pingInf] = 0) do={ 
-            :if ( [/ping address=$pingAddress count=1 as-value]->"status"=null ) do={:set res ($res + 1);}  
-        } else={
-            :if ( [/ping address=$pingAddress count=1 interface=$pingInf as-value]->"status"=null ) do={:set res ($res + 1);}   
-        }
-    }
+    :local val " address=$1 count=1 as-value";
+    :if ([:len $interface] != 0) do={:set val ($val." interface=$interface");};
+    :for i from=1 to=$count do={:if ([[:parse "/ping $val"]]->"status" = null) do={:set res ($res + 1);};};
     :return $res;
 }
 
