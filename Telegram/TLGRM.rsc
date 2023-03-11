@@ -1,18 +1,26 @@
 # TLGRM - combined notifications script & launch of commands (scripts & functions) via Telegram
-# Script uses ideas by Sertik, Virtue, Pepelxl, Dimonw, -13-, Jotne, Alice Tails, Chupaka, drPioneer
+# Script uses ideas by Sertik, Virtue, Pepelxl, Dimonw, -13-, Jotne, Alice Tails, Chupaka, drPioneer, Brook
 # https://forummikrotik.ru/viewtopic.php?p=81945#p81945
 # tested on ROS 6.49.6
 # updated 2022/10/04 added support for function prefix Ros format: $funcName or [$funcName]
-# modified 2022/10/21
+# updated 2022/10/11 added support smile-commands
+# updated 2022/10/17 added ignore registre identity
+# updated 2022/10/25 added global functions tlgrmcmd and tlgrm for set command list in chatbot and set flags
+## modified 2023/02/08
 
+:global allowTlgrm;        # Flag allow run TLGRM (true - allow, false - ban)
 :global scriptTlgrm;        # Flag of the running script:   false=>in progress, true=>idle
-    # :global Emoji
-    :local  botID    
-    :local  myChatID
-    :global broadCast false;
-    :global launchScr true;
-    :global launchFnc false;
-    :global launchCmd false;
+
+:if ([:typeof $allowTlgrm]!="bool") do={:set allowTlgrm true}
+:if ($allowTlgrm) do={
+
+    :global Emoji; # router Emoji in chat
+    :global botID "botXXX:YYYY";
+    :global myChatID "-ZZZZ";
+    :global broadCast false; # reception mode
+    :global launchScr true;  # Permission to execute scripts
+    :global launchFnc false;  # Permission to perform functions
+    :global launchCmd false;  # Permission to execute commands
 
 :do {
 
@@ -69,6 +77,20 @@
         }
         :return ($convStr);
     }
+
+# convert string to lowstring
+:local fsLowStr do={
+  :local fsLowerChar do={
+    :local "fs_lower" "0123456789abcdefghijklmnopqrstuvwxyz";
+    :local "fs_upper" "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    :local pos [:find $"fs_upper" $1]
+      :if ($pos > -1) do={:return [:pick $"fs_lower" $pos];}
+       :return $1}
+:local result ""; :local in $1
+  :for i from=0 to=([:len $in] - 1) do={
+    :set result ($result . [$fsLowerChar [:pick $in $i]])}
+    :return $result;
+}
 
     # Telegram messenger response parsing function
     # https://habr.com/ru/post/482802/
@@ -183,7 +205,8 @@
     # Main body of the script
     :global timeAct;
     :global timeLog;
-    :local  nameID [/system identity get name];
+# updated 2022/10/17 added ignore registre identity
+    :local  nameID [$fsLowStr [/system identity get name]];
     :local  timeOf [/system clock get gmt-offset];
     :put ("$[$UnixTimeToFormat ([$EpochTime]+$timeOf) 1] - Start of TLGRM-script on '$nameID' router.");
     :if ([:len $scriptTlgrm]=0) do={:set scriptTlgrm true};
@@ -218,6 +241,8 @@
                 :local msgAddr "";
                 :if ($broadCast) do={:set $msgAddr $nameID} else={
                     :set msgAddr ([:pick $msgTxt 0 [:find $msgTxt " " -1]]);
+# updated 2022/10/17 added ignore registre identity
+                    :set msgAddr [$fsLowStr $msgAddr]
                     :if ([:len [:find $msgTxt " "]]=0) do={:set msgAddr ("$msgTxt ")};
                     :put ("$[$UnixTimeToFormat ([$EpochTime]+$timeOf) 1] - Recipient of the Telegram message: '$msgAddr'");
                     :set msgTxt ([:pick $msgTxt ([:find $msgTxt $msgAddr -1]+[:len $msgAddr]+1) [:len $msgTxt]]);
@@ -243,22 +268,28 @@
                             :if (([/system script environment get [/system script environment find name=$msgTxt] value]="(code)") \
                                 or ([:len [:find [/system script environment get [/system script environment find name=$msgTxt] value] "(eval"]]>0)) do={
                                 :put ("$[$UnixTimeToFormat ([$EpochTime]+$timeOf) 1] - Telegram user $userNm launches function '$msgTxt'.");
-                                :log warning ("Telegram user $userNm launches function '$msgTxt'.");
-                                [:parse ":global $msgTxt; [\$$msgTxt $restline]"];
+                                :log info ("Telegram user $userNm launches function '$msgTxt'.");
+#                                [:parse ":global $msgTxt; [\$$msgTxt $restline]"];
+                        :execute script="[:parse [\$$msgTxt $restline]]";
                             } else={
                                 :put ("$[$UnixTimeToFormat ([$EpochTime]+$timeOf) 1] - '$msgTxt' is a global variable and not a function - no execute.");
                                 :log warning ("'$msgTxt' is a global variable and not a function - no execute.");
                             }
                         }
+# added 07/10/2022 allow to perform emodji !
+   :if ([:pick $msgTxt 0 1]="\5C") do={:set $msgTxt [:pick $msgTxt 1 [:len $msgTxt]]
+   :if ([:find $msgTxt "\5C"]!=0) do={:local a [:pick $msgTxt 0 [:find $msgTxt "\5C"]]; :local b [:pick $msgTxt ([:find $msgTxt "\5C"]+1) [:len $msgTxt]]; :set $msgTxt ($a.$b)}}
                         :if ([/system script find name=$msgTxt]!="" && $launchScr=true) do={
                             :put ("$[$UnixTimeToFormat ([$EpochTime]+$timeOf) 1] - Telegram user $userNm activates script '$msgTxt'.");
                             :log info ("Telegram user $userNm activates script '$msgTxt'.");
-                            [[:parse "[:parse [/system script get $msgTxt source]] $restline"]];
+#                            [[:parse "[:parse [/system script get $msgTxt source]] $restline"]];
+                         :execute script="[[:parse \"[:parse [/system script get $msgTxt source]] $restline\"]]";
                         }
                         :if ([/system script find name=$msgTxt]="" && [/system script environment find name=$msgTxt]="" && $launchCmd=true) do={
                             :put ("$[$UnixTimeToFormat ([$EpochTime]+$timeOf) 1] - Telegram user $userNm is trying to execute command '$msgTxt'.");
-                            :log warning ("Telegram user $userNm is trying to execute command '$msgTxt'.");
-                            :do {[:parse "/$msgTxt $restline"]} on-error={};
+                            :log info ("Telegram user $userNm is trying to execute command '$msgTxt'.");
+#                              :do {[:parse "/$msgTxt $restline"]} on-error={};
+                            :do {:execute script="[:parse \"/$msgTxt $restline\"]"} on-error={};
                         }
                     } else={:put ("$[$UnixTimeToFormat ([$EpochTime]+$timeOf) 1] - Wrong time to launch.")};
                 } else={:put ("$[$UnixTimeToFormat ([$EpochTime]+$timeOf) 1] - No command found for this device.")};
@@ -299,7 +330,7 @@
                 :set timeLog $lastTime;
                 :if ([:len $outMsg]>4096) do={:set outMsg ([:pick $outMsg 0 4096])};
                 :set outMsg [$CP1251toUTF8 $outMsg];
-                :set outMsg ("$Emoji"."$nameID".":"."%0A"."$outMsg");
+                :set outMsg ("$Emoji "."$[/system identity get name]".":"."%0A"."$outMsg");
                 :local urlString ("https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$outMsg");
                 :put ("$[$UnixTimeToFormat ([$EpochTime]+$timeOf) 1] - Generated string for Telegram:\r\n".$urlString);
                 /tool fetch url=$urlString as-value output=user;
@@ -312,4 +343,140 @@
     :set scriptTlgrm true;
     :put ("Script error: something didn't work when sending a request to Telegram.");
     :put ("*** First, check the correctness of the values of the variables botID & myChatID. ***"); 
+}
+
+# add 25/10/2022 
+# function set commands list key array in $1 to Telegram chatbot 
+:global tlgrmcmd; :if (!any $tlgrmcmd) do={:global tlgrmcmd do={
+:if ([:typeof $0]="lookup") do={
+
+#--function teSetMyCommands by Brook 2022 --
+:local teSetMyCommands do={
+  :local TbotID $fBotID
+  :local tgUrl []; :local content []
+  :local commandsList [:toarray $fCommands]
+  :local cmdItems []
+  :local command []
+  :local end []
+
+  :foreach i in=$commandsList do={
+    :local command [:pick $i 0 [find $i ";"]]
+    :local description [:pick $i ([find $i ";"] + 1) [:len $i]]
+    :local startCommand "\7B\22command\22:\22$command\22"
+    :local commandDescription ",\22description\22:\22$description\22\7D,"
+    :set command "$startCommand$commandDescription$endCommand"
+    :set $cmdItems ($cmdItems . $command)
+  }
+  :set cmdItems [:pick $cmdItems 0 ([:len $cmdItems] - 1)]
+
+  :local start "\5B"; :local end "\5D";
+  :set commandsList "$start$cmdItems$end"
+
+  :set tgUrl "https://api.telegram.org/$TbotID/setMyCommands\?commands=$commandsList"
+
+do {
+    :set content [:tool fetch ascii=yes url=$tgUrl as-value output=user]
+    :if ($content->"status" = "finished") do={ :return true }
+  } on-error={ :return false }
+ }
+
+
+# --function convert string to lowstring by Osama, modified Sertik--
+:local fsLowStr do={
+  :local fsLowerChar do={
+    :local "fs_lower" "0123456789abcdefghijklmnopqrstuvwxyz";
+    :local "fs_upper" "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    :local pos [:find $"fs_upper" $1]
+      :if ($pos > -1) do={:return [:pick $"fs_lower" $pos];}
+       :return $1}
+:local result ""; :local in $1
+  :for i from=0 to=([:len $in] - 1) do={
+    :set result ($result . [$fsLowerChar [:pick $in $i]])}
+    :return $result;
+}
+
+
+# -- Function of converting CP1251 to UTF8 by DrPioneer --
+    # https://forummikrotik.ru/viewtopic.php?p=81457#p81457
+    :local CP1251toUTF8 do={
+        :local cp1251 [:toarray {
+            "\20";"\01";"\02";"\03";"\04";"\05";"\06";"\07";"\08";"\09";"\0A";"\0B";"\0C";"\0D";"\0E";"\0F";\
+            "\10";"\11";"\12";"\13";"\14";"\15";"\16";"\17";"\18";"\19";"\1A";"\1B";"\1C";"\1D";"\1E";"\1F";\
+            "\21";"\22";"\23";"\24";"\25";"\26";"\27";"\28";"\29";"\2A";"\2B";"\2C";"\2D";"\2E";"\2F";"\3A";\
+            "\3B";"\3C";"\3D";"\3E";"\3F";"\40";"\5B";"\5C";"\5D";"\5E";"\5F";"\60";"\7B";"\7C";"\7D";"\7E";\
+            "\C0";"\C1";"\C2";"\C3";"\C4";"\C5";"\C6";"\C7";"\C8";"\C9";"\CA";"\CB";"\CC";"\CD";"\CE";"\CF";\
+            "\D0";"\D1";"\D2";"\D3";"\D4";"\D5";"\D6";"\D7";"\D8";"\D9";"\DA";"\DB";"\DC";"\DD";"\DE";"\DF";\
+            "\E0";"\E1";"\E2";"\E3";"\E4";"\E5";"\E6";"\E7";"\E8";"\E9";"\EA";"\EB";"\EC";"\ED";"\EE";"\EF";\
+            "\F0";"\F1";"\F2";"\F3";"\F4";"\F5";"\F6";"\F7";"\F8";"\F9";"\FA";"\FB";"\FC";"\FD";"\FE";"\FF";\
+            "\A8";"\B8";"\B9"}];
+        :local utf8 [:toarray {
+            "0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"000A";"0020";"0020";"000D";"0020";"0020";\
+            "0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";"0020";\
+            "0021";"0022";"0023";"0024";"0025";"0026";"0027";"0028";"0029";"002A";"002B";"002C";"002D";"002E";"002F";"003A";\
+            "003B";"003C";"003D";"003E";"003F";"0040";"005B";"005C";"005D";"005E";"005F";"0060";"007B";"007C";"007D";"007E";\
+            "D090";"D091";"D092";"D093";"D094";"D095";"D096";"D097";"D098";"D099";"D09A";"D09B";"D09C";"D09D";"D09E";"D09F";\
+            "D0A0";"D0A1";"D0A2";"D0A3";"D0A4";"D0A5";"D0A6";"D0A7";"D0A8";"D0A9";"D0AA";"D0AB";"D0AC";"D0AD";"D0AE";"D0AF";\
+            "D0B0";"D0B1";"D0B2";"D0B3";"D0B4";"D0B5";"D0B6";"D0B7";"D0B8";"D0B9";"D0BA";"D0BB";"D0BC";"D0BD";"D0BE";"D0BF";\
+            "D180";"D181";"D182";"D183";"D184";"D185";"D186";"D187";"D188";"D189";"D18A";"D18B";"D18C";"D18D";"D18E";"D18F";\
+            "D001";"D191";"2116"}];
+        :local convStr ""; 
+        :local code "";
+        :for i from=0 to=([:len $1]-1) do={
+            :local symb [:pick $1 $i ($i+1)]; 
+            :local idx [:find $cp1251 $symb];
+            :local key ($utf8->$idx);
+            :if ([:len $key]!=0) do={
+                :set $code ("%$[:pick ($key) 0 2]%$[:pick ($key) 2 4]");
+                :if ([pick $code 0 3]="%00") do={:set $code ([:pick $code 3 6])};
+            } else={:set code ($symb)}; 
+            :set $convStr ($convStr.$code);
+        }
+        :return ($convStr);
+    }
+
+
+:global botID
+:global GroupChat
+:global broadCast
+:local Identity "";
+
+:if ($2="identity") do={:set Identity [$fsLowStr [/system identity get name]]; :set Identity ("$Identity"."_")}
+:if ($2="forall") do={:set Identity ("$2"."_")}
+:if ([:len $2]=0) do={:set Identity ""}
+:local count 0
+:local TXTmessage ""
+:foreach k,v in=$1 do={
+:set $v [$CP1251toUTF8 $v]
+:set TXTmessage ("$TXTmessage"."$Identity"."$k;$v".",")
+ }
+:set TXTmessage [:pick $TXTmessage 0 ([:len $TXTmessage]-1)]
+:if ([$teSetMyCommands fBotID=$botID fCommands=$TXTmessage]) do={:return OK} else={:return ERR}
+  }
+ }
+}
+
+:global tlgrm; :if (!any $tlgrm) do={:global tlgrm do={
+:if (any $0) do={
+:if ($1="help") do={:global Emoji; :global FuncTelegramSender; [$FuncTelegramSender ("$Emoji $[/system identity get name]:%0A [/$[:pick $0 1 [:len $0]]] service function tlgrm parameters:%0A $0 allow, bun, on, off, Scr, Fnc, Cmd, GroupChat, broadCast")]; :return []}
+:if (($1="allow") && ([:len $2]=0)) do={:global allowTlgrm; :set allowTlgrm true; :return $1}
+:if (($1="bun") && ([:len $2]=0)) do={:global allowTlgrm; :set allowTlgrm false; :return $1}
+:if (($1="on") && ([:len $2]=0)) do={:global tlgrm; [$tlgrm launchScr true];  [$tlgrm launchFnc true];  [$tlgrm launchCmd true]; :return $1}
+:if (($1="off") && ([:len $2]=0)) do={:global tlgrm; [$tlgrm launchScr false];  [$tlgrm launchFnc false];  [$tlgrm launchCmd false]; :return $1}
+:if ([:len $1]=0) do={:global tlgrm; [$tlgrm help]
+ :return []}
+:if (($1="GroupChat") && ([:typeof $2]="str") && ([:pick $2 0 1]="@")) do={:global GroupChat; :set GroupChat $2; :return $2}
+:if (($1="GroupChat") && ([:len $2]=0)) do={:global GroupChat; :set GroupChat []; :return $2}
+:local fSet
+ :if (($2="true") or ($2="false")) do={
+  :if ($2="true") do={:set fSet true} else={:set fSet false}
+  :if ($1="broadCast") do={:global broadCast; :set broadCast $fSet;}    
+    :return $2}
+  :if ($1="Scr") do={:global  launchScr; :set  launchScr $fSet; :return $2}
+  :if ($1="Fnc") do={:global  launchFnc; :set  launchFnc $fSet; :return $2}
+  :if ($1="Cmd") do={:global  launchCmd; :set  launchCmd $fSet; :return $2}
+ } else={:return "ERROR function $0 parameter $1 $2"}
+ :return "ERROR function $0 parameter <$1>"
+     }
+   }
+ }
 }
