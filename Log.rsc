@@ -1,6 +1,7 @@
 ## Log
-## 0.10
+## 0.11
 ## 2023/03/09
+## Add unwanted message remove
 
 :local SendMsg do={
     :local nameID [/system identity get name;];
@@ -98,6 +99,14 @@
         :local topic;
         :local outMsg;
         :local startBuf [:toarray [/log find]];
+        :local tmpStartBuf;
+        ## Deleting unwanted message
+        :foreach n in=$startBuf do={
+            :set topic [/log get $n topics];
+            :set message [/log get $n message];
+            :if ($topic~"account" or $message~"script|log action changed") do={:put ""} else={:set tmpStartBuf ($tmpStartBuf, $n)}; 
+        }
+        :set startBuf $tmpStartBuf;
         :local start 0;
         :local end ([:len $startBuf] -1);
         ## Options
@@ -119,8 +128,7 @@
         :for n from=$start to=$end do={
             :set message [$FindMacAddr [/log get [:pick $startBuf $n] message]];
             :set time [/log get [:pick $startBuf $n] time];
-            :set topic [/log get [:pick $startBuf $n] topics];
-            :if ($topic~"account" or $message~"script|log action changed") do={:put "";} else={:set outMsg ($outMsg.">".$time.": ".$message."\n")};
+            :set outMsg ($outMsg."> ".$time.": ".$message."\n");
         }
         :set $outMsg [$CP1251toUTF8 $outMsg];
         :if ([:len $outMsg] > 4096) do={
