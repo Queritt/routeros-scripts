@@ -1,33 +1,34 @@
 # LTE status
-# 0.10
-# 2022/11/5
-:local lte ether2;
-:local pingCountHost 2;
-:local pingCountGate 3;
-# yandex.ru, Cloudflare, GoogleDNS, mail.ru
-:local pingHost {87.250.250.242; 1.1.1.1; 8.8.8.8; 94.100.180.200};
-:local pingHostWake 8.8.8.8;
-:local pingLTEGate 192.168.8.1;
+# 0.20 
+# 2023/01/07
+
+:global lteInf lte1;
+:global lteStatus;
+:local lteInfOk [/interface find name=lte1];
 :local lteInetOk false;
-:local lteGateOk false;
 :local ltePing 0;
-:local lteGatePing 0;
-# Ping Gate
-:local res [/ping $pingLTEGate count=$pingCountGate interface=$lte];
-:set lteGatePing ($lteGatePing + $res);
-:set lteGateOk ($lteGatePing >= 1);
-:put "lteGateOk=$lteGateOk";
-# Ping LTE 
-:if ($lteGateOk) do={
-  /ping $pingHostWake count=3 interface=$lte;
-  :delay 3s;
-  foreach k in=$pingHost do={
-    :local res [/ping $k count=$pingCountHost interface=$lte];
-    :set ltePing ($ltePing + $res);
-  }
-  :set lteInetOk ($ltePing >= 5);
-  :put "lteInetOk=$lteInetOk";
-  if (!$lteInetOk) do={
-    /log warning "LTE DOWN (status)";
-  }
+:local pingCount 2;
+# yandex.ru, cloudflare, GoogleDNS, mail.ru
+:local pingHost {87.250.250.242; 1.1.1.1; 8.8.8.8; 94.100.180.200};
+:if ( [:typeof $lteStatus] = "nothing" ) do={ :set lteStatus false; };
+
+:if ( $lteInfOk ) do={
+    :foreach k in=$pingHost do={
+        :local res [/ping $k count=$pingCount interface=$lteInf]
+        :set ltePing ($ltePing + $res);
+    }
+    :set lteInetOk ($ltePing >= 5);
+    :put "lteInetOk=$lteInetOk";
+    :if ( $lteInetOk ) do={
+        :if ( ! $lteStatus ) do={
+            :set lteStatus true;
+            /log warning "LTE | UP";
+        }
+    } else={
+        :if ( $lteStatus ) do={
+            :set lteStatus false;
+            /system routerboard usb power-reset duration=5s;
+            /log warning "LTE DOWN | USB-power reseted"; 
+        }
+    }
 }
