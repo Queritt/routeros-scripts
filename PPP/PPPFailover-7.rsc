@@ -1,7 +1,7 @@
 ## PPPFailover
-## 0.83 / 7.x
-## 2023/03/05
-## RenewList fills into every server changing; Added random server finding if not found prefer country; Added ping threshold func;
+## 0.84 / 7.x
+## 2023/03/06
+## Added shuffle func for serverlist
 ## Changing server from file
 ## File in flash and contains name as "providerName" value
 
@@ -38,6 +38,23 @@
     }
     :if ([:typeof $res] = "nil") do={:return false};
     :if (($res / $pingCnt) > $suitePing) do={:return false}; :return true;
+}
+
+:global ListRandom do={
+    ## Value required: $1(list);
+    :local serverList $1;
+    :local lenServerList [:len $serverList];
+    :local randServerList;
+    :local randNumArray;
+    :local randNum;
+    :while ( [:len $randNumArray] < $lenServerList ) do={
+        :set randNum [:rndnum from=0 to=($lenServerList - 1)]; 
+        :if ([:typeof [:find $randNumArray $randNum]] = "nil") do={
+            :set randNumArray ($randNumArray, $randNum);
+            :set randServerList ($randServerList, {[:pick $serverList $randNum]});
+        }
+    }
+    :return $randServerList;
 }
 
 :local FileToArray do={
@@ -87,6 +104,7 @@
     :local renewList $6;
     :local existAddress ({});
     :global PingLevel;
+    :global ListRandom;
     :global main1Renew;
     :global main2Renew;
     :global serverList;
@@ -95,12 +113,13 @@
     :local city "";
     :local curAddress;
     :local suiteStatus false;
+    :local randServerList [$ListRandom $serverList];
     :foreach i in=[/interface l2tp-client find (comment ~"$providerName")] do={
         :set existAddress ($existAddress, [/interface l2tp-client get $i connect-to]);
     }
     #--Setting prever list by name client
     :foreach preferCountry in=$preferList do={
-        :foreach n in=$serverList do={
+        :foreach n in=$randServerList do={
             :set address [:pick $n 0];
             :set country [:pick $n 1];
             :set city    [:pick $n 2];
@@ -126,18 +145,6 @@
     }
     #--If not found prefer country (NOT for onlyOneListClient)
     :if ( [:typeof [:find $oneListClient $clientName] ] = "nil" ) do={
-        ## Random array from server list length
-        :local lenServerList [:len $serverList];
-        :local randServerList;
-        :local randNumArray;
-        :local randNum;
-        :while ( [:len $randNumArray] < $lenServerList ) do={
-            :set randNum [:rndnum from=0 to=($lenServerList - 1)]; 
-            :if ([:typeof [:find $randNumArray $randNum]] = "nil") do={
-                :set randNumArray ($randNumArray, $randNum);
-                :set randServerList ($randServerList, {[:pick $serverList $randNum]});
-            }
-        }
         :foreach n in=$randServerList do={
             :set address [:pick $n 0];
             :set country [:pick $n 1];
