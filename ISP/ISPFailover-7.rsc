@@ -1,7 +1,7 @@
 ## ISPFailover 
-## ver 0.91 / 7.x
-## Optimized code
-## modified 2023/02/03
+## ver 0.92 / 7.x
+## Changed func Ping, HostPing
+## modified 2023/02/04
 ## Run every 93s
 :global ispInf ether1;
 :global lteInf lte1;
@@ -14,35 +14,19 @@
 :global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
 
 :global Ping do={
-    :local pingAddress $1;
-    :local pingCount $count;
-    :local pingInf $interface;
+    ## Value required: $1(address); count; [interface]
     :local res 0;
-    :for i from=1 to=$pingCount step=1 do={
-        :if ( [:len $pingInf] = 0) do={ 
-            :if ( [/ping address=$pingAddress count=1 as-value]->"status"=null ) do={:set res ($res + 1);}  
-        } else={
-            :if ( [/ping address=$pingAddress count=1 interface=$pingInf as-value]->"status"=null ) do={:set res ($res + 1);}   
-        }
-    }
+    :local val " address=$1 count=1 as-value";
+    :if ([:len $interface] != 0) do={:set val ($val." interface=$interface");};
+    :for i from=1 to=$count do={:if ([[:parse "/ping $val"]]->"status" = null) do={:set res ($res + 1);};};
     :return $res;
 }
 
 :global HostPing do={
     ## Value required: host; count; [interface]
-    :global Ping;
-    :global Resolve;
-    :local res 0;
-    :local counter 0;
-    :foreach k in=$host do={
-        :if ( [:len $interface] = 0) do={ 
-            :set res [$Ping [$Resolve $k] count=$count];
-        } else={
-            :set res [$Ping [$Resolve $k] count=$count interface=$interface];
-        }
-        :set counter ($counter + $res);
-    }
-    :return $counter;
+    :global Ping; :global Resolve; :local res 0;
+    :foreach k in=$host do={:set res ($res + [$Ping [$Resolve $k] count=$count interface=$interface]);};
+    :return $res;
 }
 
 :local SwitchToISP do={
@@ -60,8 +44,8 @@
     /interface enable l2tp-out1;
     /interface enable l2tp-out2;
     ## /interface enable l2tp-out3;
-    :delay 2s
-    /log warning "ISP UP | Switched to main internet connection";
+    :delay 2s;
+    /log warning "ISP UP | Main internet activated";
 }
 
 :local SwitchToLTE do={
@@ -81,7 +65,7 @@
     /interface enable [find name="l2tp-out2"];
     ## /interface enable [find name="l2tp-out3"];
     :delay 2s;
-    /log warning "ISP DOWN | Switched to reserve internet connection";
+    /log warning "ISP DOWN | Reserv internet activated";
 }
 
 ## BGP 
@@ -101,7 +85,7 @@
     :if ($lteGateDist = 1) do={$SwitchToISP;}
 } else={ 
     :if (($lteGateDist = 4) && $lteInfOk) do={
-        :delay 5;
+        :delay 5s;
         ## Main interface ping Step-2
         :if ([$HostPing host=$pingHost count=$pingCount interface=$ispInf] > 0) do={:return []};
         ## Reserv interface ping
