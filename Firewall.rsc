@@ -1,6 +1,6 @@
 # Firewall
-# ver 0.4
-# modified 2022/09/22
+# ver 0.5
+# modified 2022/09/24
 #---Function of sending message to telegram bot
 :local SendMsg do={
     :local  nameID [ /system identity get name; ];
@@ -36,9 +36,17 @@
     }
     :if ( $action = "enable" || $action = "disable" ) do={
         :do {
-            [:parse ("ip firewall address-list $action [find comment=$address]")];
-            :return ("Address-list: " . "\"$address\"" . " successfully " . "$action" . "d.");
-        } on-error={ :return "Address-list $action error: \"$address\" is wrong! Try again..."; }  
+            :foreach i in=[/ip firewall address-list find] do={
+                :if ( [/ip firewall address-list get $i comment] = $address ) do={
+                    :if ( $action = "enable" && [/ip firewall address-list get $i disabled] \
+                        || $action = "disable" && ![/ip firewall address-list get $i disabled]) do={
+                        [:parse ("ip firewall address-list $action [find comment=$address]")];
+                        :return ("Address-list: " . "\"$address\"" . " successfully " . "$action" . "d.");
+                    } else={ :return ("Address-list: " . "\"$address\"" . " already " . "$action" . "d!"); }   
+                }
+            }
+            :return "Address-list $action error: \"$address\" not found! Try again..."; 
+        } on-error={ :return "Address-list $action error: something went wrong! Try again..."; }  
     }
 }
 #---MAIN
