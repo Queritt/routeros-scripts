@@ -1,14 +1,14 @@
 # ISP Status
-# 0.3 / 7.x
-# 2023/01/17
+# 0.4 / 7.x
+# Add resolver for hosts
+# 2023/01/18
 :global ispInf ether1
 :global lteInf lte1
 :local pingHostCnt 1
 :local pingGateCnt 3
 # yandex.ru, OpenDNS, GoogleDNS, mail.ru
 # :local pingHost {87.250.250.242; 208.67.222.222; 8.8.8.8; 94.100.180.200};
-#-- yandex.ru, google.com, mail.ru
-:local pingHost {87.250.250.242; 64.233.164.101; 94.100.180.200};
+:local pingHost {"yandex.ru"; "google.com"; "mail.ru"};
 # :local pingHostWake 8.8.8.8; 
 :local pingISPGate IP;
 :local pingLTEGate 192.168.8.1;
@@ -20,6 +20,8 @@
 :local ltePing 0;
 :local ispGatePing 0;
 :local lteGatePing 0;
+
+:global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
 
 :global Ping do={
     :local pingAddress $1;
@@ -48,7 +50,7 @@ if (!$ispGateOk) do={
     /log warning "ISP-Gate DOWN (Status)";
 } else={
     foreach k in=$pingHost do={
-        :local res [$Ping $k count=$pingHostCnt interface=$ispInf];
+        :local res [$Ping [$Resolve $k] count=$pingHostCnt interface=$ispInf];
         :set ispPing ($ispPing + $res);
     }
     :set ispInetOk ($ispPing > 0);
@@ -67,7 +69,7 @@ if (!$lteGateOk) do={
     # }
     # :delay 3s;
     foreach k in=$pingHost do={
-        :local res [$Ping $k count=$pingHostCnt interface=$lteInf];
+        :local res [$Ping [$Resolve $k] count=$pingHostCnt interface=$lteInf];
         :set ltePing ($ltePing + $res);
     }
     :set lteInetOk ($ltePing > 0);
