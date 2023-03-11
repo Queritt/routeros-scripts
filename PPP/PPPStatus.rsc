@@ -1,13 +1,14 @@
 # PPP client management
-# ver 0.22
-# modified 2022/08/03
+# ver 0.24
+# modified 2022/08/24
 
 #---Function of showing information about available commands
 :local Help do={
     :local help ("PPP options: "."%0A". \
         " > print [name/all; time; pass; call; netwatch; nat]"."%0A". \
-        " > rename [oldname; newname]"."%0A". \
+        " > rename [oldname; newname/nouse]"."%0A". \
         " > set/add [nat; name; \"80/445/udp\"]"."%0A". \
+        " > set [pass; name; 8-24 characters]"."%0A". \
         " > enable/disable/remove [netwatch/nat; name]");
     [[:parse [/system script get TG source]] Text=$help];
 }
@@ -23,16 +24,18 @@
     :local notAccessList {"PDA"; "PPP-OUT-2"; "WM"; "RDP"; "Reserved"; "OVPN"; "SSTP"}
     :local oldName $1;
     :local newName $2;
-    :local clientPPP;
-    :set clientPPP [ /ppp secret find (comment="$oldName") ];
+    :local clientPPP [ /ppp secret find (comment="$oldName") ];
     if ([:len $clientPPP] > 0) do={
         :foreach n in=$notAccessList do={ 
             :if ($n = $oldName) do={
                 :return ("PPP rename error: editing "."\"$oldName\""." denied!");
             } 
         }
+        :if ($newName = "nouse") do={
+            :set newName [/ppp secret get $clientPPP name]; 
+        }
         #---change secret
-        /ppp secret set [find comment="$oldName"] comment=$newName;
+        /ppp secret set $clientPPP comment=$newName;
         #---change interface
         /interface set [find comment=$oldName] comment=$newName;
         #---change netwatch
@@ -202,6 +205,11 @@
                 :return ($nameClient." nat $port/$protocol successfully added"); 
             }
         } on-error={ :return "$target $action error: wrong protocol or port! Try again..."; }
+    }
+    :if ( $target = "pass" ) do={
+        :if ( [:len $port] = 0 ) do={ :return ("Password is empty. Try again..."); }
+        [:parse ("ppp secret $action [find comment=$clientComment] password=$port")];
+        :return ("PPP: " . $nameClient . " password successfully changed."); 
     }
     :return "Set error: option \"$target\" or port not recognized! Try again..."; 
 }
