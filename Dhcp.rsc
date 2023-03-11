@@ -1,5 +1,5 @@
 # DHCP client management
-# ver 0.10
+# ver 0.20
 # modified 2022/11/12
 #---Function of sending message to telegram bot
 :local SendMsg do={
@@ -107,13 +107,13 @@
         :if ($target = "netwatch") do={
             :if [ /tool netwatch find comment="$clientComment"; ] do={
                 [:parse ("tool netwatch $action [find comment=$clientComment]")];
-                :return ($nameClient." netwatch successfully "."$action"."d."); 
+                :return ("\"$nameClient\""." netwatch successfully "."$action"."d."); 
             } else={ :return "$target error: \"$nameClient\" not exist! Try again..."; }
         } 
         :if ($target = "nat") do={
             :if [ /ip firewall nat find comment="$clientComment"; ] do={
                 [:parse ("ip firewall nat $action [find comment=$clientComment]")];
-                :return ($nameClient." nat successfully "."$action"."d."); 
+                :return ("\"$nameClient\""." nat successfully "."$action"."d."); 
             } else={ :return "$target error: \"$nameClient\" not exist! Try again..."; }
         }  
         :return "Edit error: \"$target\" not recognized! Try again..."; 
@@ -127,11 +127,11 @@
     :local port $4;
     :local protocol "tcp";
     if ( [/ip dhcp-server lease find (comment="$nameClient")] = "") do={ :return "DHCP setting error: client \"$nameClient\" not found! Try again..."; }
-    :local clientAddress [ /ip dhcp-server lease get $nameClient address; ];
-    :local externalAddress [ /ip address get [find interface="ether1"] address; ];
-    :set externalAddress [:pick $externalAddress 0 [:find $externalAddress "/" -1]];
     #--- Nat Set
     :if ( ($target = "nat") && ([:len $port] > 0) ) do={
+        :local clientAddress [ /ip dhcp-server lease get $nameClient address; ];
+        :local externalAddress [ /ip address get [find interface="ether1"] address; ];
+        :set externalAddress [:pick $externalAddress 0 [:find $externalAddress "/" -1]];
         #--- Replacing "/" to ","
         :local string $port;
         :local newString "";
@@ -161,17 +161,17 @@
             :return "$target set error: \"$nameClient\" not exist! Try again..."; 
         }
         :if ( $action = "add" && [ /ip firewall nat find comment="$nameClient"; ] ) do={ 
-            :return "$target set error: \"$nameClient\" already exist! Try again..."; 
+            :return "$target add error: \"$nameClient\" already exist! Try again..."; 
         }
         :do {
             :if ( $action = "set" ) do={ 
                 [:parse ("ip firewall nat $action [find comment=$nameClient] dst-port=$port protocol=$protocol")];
-                :return ($nameClient." nat $port/$protocol successfully set"); 
+                :return ("\"$nameClient\""." nat $port/$protocol successfully set"); 
             } 
             :if ( $action = "add" ) do={ 
                 [:parse ("ip firewall nat $action action=dst-nat chain=dstnat comment=$nameClient dst-address=$externalAddress \
                     dst-port=$port in-interface=ether1 protocol=$protocol to-addresses=$clientAddress")];
-                :return ($nameClient." nat $port/$protocol successfully added"); 
+                :return ("\"$nameClient\""." nat $port/$protocol successfully added"); 
             }
         } on-error={ :return "$target $action error: wrong protocol or port! Try again..."; }
     }
@@ -180,7 +180,7 @@
         :if ( [:len $port] = 0 ) do={ :return ("MAC is empty. Try again..."); }
         :do {
             [:parse ("ip dhcp-server lease $action [find comment=$nameClient] mac-address=$port")];
-            :return ("DHCP: " . $nameClient . " mac successfully changed."); 
+            :return ("DHCP: " . "\"$nameClient\"" . " mac successfully changed."); 
         } on-error={ :return "DHCP $target $action error: wrong format! Try again..."; }
     }
     :return "DHCP setting error: option \"$target\" or port not recognized! Try again..."; 
