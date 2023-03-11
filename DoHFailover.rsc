@@ -1,11 +1,22 @@
-# DoH failover
-# 0.40
-# 2022/10/06
+## DoH failover
+## 0.41 / 7.x
+## Changed func Ping
+## 2023/02/04
 :global dnsSrvStatus1;
 :global dnsSrvStatus2;
 :global dnsSrvStatus3;
 :local dnsSrv1 "1.1.1.1";
 :local dnsSrv2 "dns.google";
+
+:global Ping do={
+    ## Value required: $1(address); count; [interface]
+    :local res 0;
+    :local val " address=$1 count=1 as-value";
+    :if ([:len $interface] != 0) do={:set val ($val." interface=$interface");};
+    :for i from=1 to=$count do={:if ([[:parse "/ping $val"]]->"status" = null) do={:set res ($res + 1);};};
+    :return $res;
+}
+
 # Over PPP-OUT
 # :local pingInf "l2tp-out2";
 # This inicializes the DNSServFlags variables, in case this is the 1st time the script has ran
@@ -20,7 +31,7 @@
 :local ispPing 0;
 # Over PPP-OUT
 # :foreach host in=$pingHost do={ :local res [/ping $host interface=$pingInf count=1]; :set ispPing ($ispPing + $res); };
-:foreach host in=$pingHost do={ :local res [/ping $host count=1]; :set ispPing ($ispPing + $res); };
+:foreach host in=$pingHost do={ :local res [$Ping $host count=1]; :set ispPing ($ispPing + $res); };
 if ( $ispPing > 0 ) do={
     # Ping DoH Server-1
     # Over PPP-OUT
