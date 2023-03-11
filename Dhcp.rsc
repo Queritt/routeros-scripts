@@ -1,6 +1,6 @@
 # DHCP client management
-# ver 0.20
-# modified 2022/11/12
+# ver 0.30
+# modified 2022/11/25
 #---Function of sending message to telegram bot
 :local SendMsg do={
     :local  nameID [ /system identity get name; ];
@@ -160,7 +160,7 @@
         :if ( $action = "set" && [ /ip firewall nat find comment="$nameClient"; ] = 0 ) do={ 
             :return "$target set error: \"$nameClient\" not exist! Try again..."; 
         }
-        :if ( $action = "add" && [ /ip firewall nat find comment="$nameClient"; ] ) do={ 
+        :if ( $action = "add" && [ /ip firewall nat find comment="$nameClient"; ] = 0 ) do={ 
             :return "$target add error: \"$nameClient\" already exist! Try again..."; 
         }
         :do {
