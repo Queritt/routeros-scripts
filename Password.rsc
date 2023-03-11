@@ -1,9 +1,10 @@
 # Password generator
-# ver 0.2
-# modified 2022/08/24
+# ver 0.3
+# modified 2022/09/06
 :local lenPass;
 :local countPass;
-:local passList ("Password: " . "%0A");
+:local passList "";
+# :local passList ("Password: " . "%0A");
 #--
 :local Help do={
     :local help ("Password options: "."%0A". \
@@ -28,5 +29,7 @@
         :set $new ( [:pick $new 3 ([:len $new] - 1)] . [:pick $new 0 3] );
         :set $passList ("$passList" . "$new" . "%0A");
     }
-    :if ( $0 = "print") do={ $SendMsg ("$passList"); } else={ :if ($countPass = 1) do={ :return $passList; } };
+    # :if ( $0 = "print") do={ $SendMsg ("Password: " . "%0A" . "$passList"); } else={ :if ($countPass = 1) do={ :return $passList; } };
+
+    :if ( $0 = "print") do={ $SendMsg ("Password: " . "%0A" . "$passList"); } else={ :if ($countPass = 1) do={ :return [:pick $passList 0 [:find $passList "%"]]; } };
 } on-error={ $SendMsg ("Password: Something went wrong. Try again...") };
