@@ -1,7 +1,7 @@
 ## PPPFailover
-## 0.81 / 7.x
-## 2023/03/04
-## RenewList fills into every server changing.
+## 0.82 / 7.x
+## 2023/03/05
+## RenewList fills into every server changing; Added random server finding if not found prefer country;
 ## Changing server from file
 ## File in flash and contains name as "providerName" value
 
@@ -75,45 +75,68 @@
     :local address "";
     :local country "";
     :local city "";
+    :local curAddress;
     :local suiteStatus false;
     :foreach i in=[/interface l2tp-client find (comment ~"$providerName")] do={
         :set existAddress ($existAddress, [/interface l2tp-client get $i connect-to]);
     }
     #--Setting prever list by name client
     :foreach preferCountry in=$preferList do={
-        :for n from=0 to=([:len $serverList]-1) do={
-            :set address [:pick [:pick $serverList $n] 0];
-            :set country [:pick [:pick $serverList $n] 1];
-            :set city    [:pick [:pick $serverList $n] 2];
+        :foreach n in=$serverList do={
+            :set address [:pick $n 0];
+            :set country [:pick $n 1];
+            :set city    [:pick $n 2];
             :set suiteStatus ($preferCountry = $country);
             :if ($suiteStatus) do={ :set suiteStatus ([:typeof [:find $existAddress $address]] = "nil") };
             :if ($suiteStatus) do={ :set suiteStatus ([:typeof [:find $renewList "$address"]] != "num") };
             :if ($suiteStatus) do={ :set suiteStatus ([/ping address=$address count=3] > 0) };
             :if ($suiteStatus) do={
+                :set curAddress [/interface l2tp-client get $clientName connect-to];
                 :local tempComment ($clientComment . "-" . $providerName . "-" . $country . ", " . $city);
                 /interface l2tp-client set $clientName connect-to=$address comment=$tempComment;
                 :if ($clientComment = "main1") do={ 
-                    :set $main1Renew ( $main1Renew, "$address"); 
-                } else={ :set $main2Renew ( $main2Renew, "$address" ); }
+                    :if ([:len $main1Renew] = 0) do={:set main1Renew ($main1Renew, $curAddress)};
+                    :set main1Renew ($main1Renew, "$address"); 
+                } else={ 
+                    :if ([:len $main2Renew] = 0) do={:set main2Renew ($main2Renew, $curAddress)};
+                    :set main2Renew ($main2Renew, "$address"); 
+                }
                 :return ("PPP-OUT-$clientComment DOWN. Host changed: " . "\"$country, $city\"");
             }
         }
     }
     #--If not found prefer country (NOT for onlyOneListClient)
     :if ( [:typeof [:find $oneListClient $clientName] ] = "nil" ) do={
-        :for n from=0 to=([:len $serverList]-1) do={
-            :set address [:pick [:pick $serverList $n] 0];
-            :set country [:pick [:pick $serverList $n] 1];
-            :set city    [:pick [:pick $serverList $n] 2];
+        ## Random array from server list length
+        :local lenServerList [:len $serverList];
+        :local randServerList;
+        :local randNumArray;
+        :local randNum;
+        :while ( [:len $randNumArray] < $lenServerList ) do={
+            :set randNum [:rndnum from=0 to=($lenServerList - 1)]; 
+            :if ([:typeof [:find $randNumArray $randNum]] = "nil") do={
+                :set randNumArray ($randNumArray, $randNum);
+                :set randServerList ($randServerList, {[:pick $serverList $randNum]});
+            }
+        }
+        :foreach n in=$randServerList do={
+            :set address [:pick $n 0];
+            :set country [:pick $n 1];
+            :set city    [:pick $n 2];
             :set suiteStatus ([:typeof [:find $existAddress $address]] = "nil");
             :if ($suiteStatus) do={ :set suiteStatus ([:typeof [:find $renewList "$address"]] != "num") };
             :if ($suiteStatus) do={ :set suiteStatus ([/ping address=$address count=3] > 0) };
             :if ($suiteStatus) do={
+                :set curAddress [/interface l2tp-client get $clientName connect-to];
                 :local tempComment ($clientComment . "-" . $providerName . "-" . $country . ", " . $city);
                 /interface l2tp-client set $clientName connect-to=$address comment=$tempComment;
                 :if ($clientComment = "main1") do={ 
-                    :set $main1Renew ( $main1Renew, "$address"); 
-                } else={ :set $main2Renew ( $main2Renew, "$address" ); }
+                    :if ([:len $main1Renew] = 0) do={:set main1Renew ($main1Renew, $curAddress)};
+                    :set main1Renew ($main1Renew, "$address"); 
+                } else={ 
+                    :if ([:len $main2Renew] = 0) do={:set main2Renew ($main2Renew, $curAddress)};
+                    :set main2Renew ($main2Renew, "$address"); 
+                }
                 :return ("PPP-OUT-$clientComment DOWN. Prefer not found, host changed: " . "\"$country, $city\"");
             }
         }
