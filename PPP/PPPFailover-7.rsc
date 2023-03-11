@@ -1,7 +1,7 @@
 ## PPPFailover
-## 0.84 / 7.x
-## 2023/03/06
-## Added shuffle func for serverlist
+## 0.85 / 7.x
+## 2023/03/07
+## Added function to renew all interfece
 ## Changing server from file
 ## File in flash and contains name as "providerName" value
 
@@ -90,7 +90,7 @@
 
 :local Help do={
     :local help ("PPPFailover option: "."%0A". \
-        " > renew [main1; main2]" . "%0A". \
+        " > renew [all; main1; main2]" . "%0A". \
         " > reset [main1; main2; all]");
     :return $help;
 }
@@ -205,6 +205,10 @@
 }
 
 :if ($action = "renew") do={
+    :if ($renewInf = "all") do={
+        /log warning ("Renew: ".[$ChangeServer $providerName $main1Inf "main1" $main1InfPreferList $InfOneList $main1Renew]);
+        /log warning ("Renew: ".[$ChangeServer $providerName $main2Inf "main2" $main2InfPreferList $InfOneList $main2Renew]); return [];
+    }
     :if ($renewInf = "main1") do={
         /log warning ("Renew: ".[$ChangeServer $providerName $main1Inf "main1" $main1InfPreferList $InfOneList $main1Renew]); return [];
     }
