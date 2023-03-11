@@ -1,12 +1,11 @@
 # ispFailover 
 # BGP edition
-# ver 0.50
-# modified 2022/11/25
+# ver 0.60
+# modified 2023/01/05
 :global ispInf ether1;
 :global lteInf lte1;
 :global ispFailCnt;
 :global ispFail;
-:global ispId;
 :global lteId;
 :local lteInfOk [/interface find name=lte1];
 :local pingCount 1;
@@ -18,10 +17,10 @@
 :local ispPing 0;
 :local ltePing 0;
 :local failTreshold 3;
-:local ispGateDist;
 :local lteGateDist;
 
 :local SwitchToISP do={
+    :global lteId;
     #/ ip firewall connection remove [find];
     # /ip route set [find comment="LTE"] distance=4;
     /ip route set $lteId distance=4;
@@ -40,6 +39,7 @@
 }
 
 :local SwitchToLTE do={
+    :global lteId;
     :delay 1s; 
     # /ip route set [find comment="LTE"] distance=1;
     /ip route set $lteId distance=1;
@@ -61,22 +61,18 @@
 # This inicializes the PingFailCount variables, in case this is the 1st time the script has ran
 :if ( [:typeof $ispFailCnt] = "nothing" ) do={ :set ispFailCnt 0; :set ispFail false; }
 # BGP 
-:if ([:typeof $ispId] = "nothing") do={
+:if ([:typeof $lteId] = "nothing") do={
     :local bgpStatus false;
     :if ( ![/routing bgp peer get [find comment="antifilter.download"] disabled] ) do={ 
         /routing bgp peer disable [find comment="antifilter.download"]; 
         :set $bgpStatus true;
         :delay 5s;
     } 
-    :set ispId [/ip route find comment="ISP"];
     :set lteId [/ip route find comment="LTE"];
     :if ($bgpStatus) do={ /routing bgp peer enable [find comment="antifilter.download"]; }
 }
-# :set ispGateDist [/ip route get [find comment="ISP"] distance];
 # :set lteGateDist [/ip route get [find comment="LTE"] distance];
-:set ispGateDist [/ip route get $ispId distance];
 :set lteGateDist [/ip route get $lteId distance];
-:put "ispGateDist=$ispGateDist";
 :put "lteGateDist=$lteGateDist";
 # Check ISP ping
 :foreach k in=$pingHost do={
@@ -89,7 +85,7 @@ if ($ispInetOk) do={
     :if ($ispFailCnt > 0) do={
         :set ispFailCnt ($ispFailCnt - 1);
         :put "ispFailCnt k=$ispFailCnt";
-        :if ( ($ispFailCnt = ($failTreshold - 1)) && ($ispGateDist >= $lteGateDist) ) do={
+        :if ( ($ispFailCnt = ($failTreshold - 1)) && ($lteGateDist = 1) ) do={
             :if ( ! $ispFail ) do={
                 $SwitchToISP; 
             } else={
@@ -101,7 +97,7 @@ if ($ispInetOk) do={
         }
     }
     # In case when the router power is interrupted
-    :if ( ($ispFailCnt = 0) && ($ispGateDist >= $lteGateDist) ) do={
+    :if ( ($ispFailCnt = 0) && ($lteGateDist = 1) ) do={
         $SwitchToISP; 
     }
 } else={ 
@@ -118,7 +114,7 @@ if ($ispInetOk) do={
                 }
                 :set lteInetOk ($ltePing >= 3)
                 :put "lteInetOk=$lteInetOk";
-                :if ($lteInetOk && ($ispGateDist <= $lteGateDist)) do={
+                :if ($lteInetOk && ($lteGateDist = 4)) do={
                     $SwitchToLTE;
                 }
             } else={
@@ -129,7 +125,7 @@ if ($ispInetOk) do={
             }
         }
     } 
-    if ( ($ispFailCnt > $failTreshold) && ($ispGateDist <= $lteGateDist) ) do={
+    if ( ($ispFailCnt > $failTreshold) && ($lteGateDist = 4) ) do={
         :if ( $lteInfOk ) do={
             /ping $pingHostWake count=$pingCount interface=$lteInf;
             :delay 3s;
