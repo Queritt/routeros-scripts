@@ -1,12 +1,15 @@
 # Config Export
-# 0.3
-# 2022/10/23
+# 0.40
+# 2023/01/05
 :local sysName [/system identity get name];
 :local sysDate [/system clock get date];
 :local numMounth ( [:find "rexjanfebmaraprmayjunjulagosepoctnovdec" [:pick $sysDate 0 3] -1] / 3 );
+:if ( [:len $numMounth] = 1 ) do={ :set numMounth ("0" . "$numMounth") };
 :local sysTime [/system clock get time];
-:local sysVer [/system package get system version];
-# :local sysVer [/system package get routeros version]; 
+# ROS 6.x ::
+# :local sysVer [/system package get system version];
+# ROS 7.x ::
+:local sysVer [/system package get routeros version]; 
 
 :local FreeSpace do={
 	/file remove [find name="tmp.rsc"];
