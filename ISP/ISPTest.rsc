@@ -1,7 +1,7 @@
 ## ISPTest
-## 0.41
-## Changed output of result: to the log if launches from the router
-## 2023/02/11
+## 0.42
+## Minor code change
+## 2023/02/26
 ## Run from router: [[:parse [/system script get ISPTest source]] run all noprint];
 
 :global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
@@ -53,8 +53,8 @@
         :foreach n in=$pingInf do={ 
             :local tmpInf [/interface list member get $n interface];
             :if ( [:typeof [:find $tmpInf "*"]] = "nil" ) do={
-                :set infOk false;
                 :if ( ![/interface get [find name=$tmpInf] disabled] ) do={
+                    :set infOk false;
                     :foreach k in=$pingHost do={
                         :local tmpPing 0;
                         :local tmpIp [$Resolve $k];
