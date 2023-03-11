@@ -1,6 +1,6 @@
 # Firewall
-# ver 0.3
-# modified 2022/09/07
+# ver 0.4
+# modified 2022/09/22
 #---Function of sending message to telegram bot
 :local SendMsg do={
     :local  nameID [ /system identity get name; ];
@@ -9,6 +9,7 @@
 #---Function of showing information about available commands
 :local Help do={
     :local help ("Firewall options: "."%0A". \
+    " > list print"."%0A". \
     " > list add [ip/address]"."%0A". \
     " > list enable/disable [comment]");
     :return $help;
@@ -17,7 +18,16 @@
 :local AddressList do={
     :local action $1;
     :local address $2;
-    :local tempComment ("address-list:" . "%0A");
+    :if ( $action = "print" ) do={
+    	:local tempString ("firewall out list: " . "%0A");
+    	:foreach i in=[/ip firewall address-list find] do={
+    		:local tempComment [/ip firewall address-list get $i comment];
+			:if ( $tempComment ~"OUT" ) do={
+				:set tempString ("$tempString" . " > " . "$tempComment" . "%0A");
+			}
+		}
+		:return $tempString;
+    }
     :if ( $action = "add" ) do={
         :do {
             [:parse ("ip firewall address-list $action address=$address list=WEB-2 timeout=01:00:00 comment=\"Firewall-script\"")];
@@ -34,7 +44,7 @@
 #---MAIN
 #---List
 :if ($0 = "list") do={
-    :if ($2 != null) do={ 
+    :if ($1 != null) do={ 
         $SendMsg [ $AddressList $1 $2 ]; return [];
     } else={ $SendMsg ("Firewall $0 error: not enough arguments. Try again..."); :return []; } 
 } 
