@@ -1,25 +1,14 @@
 ## ISP Status
-## 0.42 / 7.x
+## 0.50 / 7.x
 ## 2023/02/04
-## Changed func Ping
+## Add first step on fails
 :global ispInf ether1
 :global lteInf lte1
-:local pingHostCnt 1
-:local pingGateCnt 3
-# yandex.ru, OpenDNS, GoogleDNS, mail.ru
-# :local pingHost {87.250.250.242; 208.67.222.222; 8.8.8.8; 94.100.180.200};
 :global pingHost {"yandex.ru"; "google.com"; "mail.ru"};
-# :local pingHostWake 8.8.8.8; 
 :local pingISPGate IP;
 :local pingLTEGate 192.168.8.1;
-:local ispInetOk false;
-:local ispGateOk false;
-:local lteInetOk false;
-:local lteGateOk false;
-:local ispPing 0;
-:local ltePing 0;
-:local ispGatePing 0;
-:local lteGatePing 0;
+:local pingGateCnt 3
+:local pingHostCnt 1
 
 :global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
 
@@ -32,43 +21,47 @@
     :return $res;
 }
 
-#--Ping Gates
-:set ispGatePing [/ping $pingISPGate count=$pingGateCnt interface=$ispInf];
-:set lteGatePing [/ping $pingLTEGate count=$pingGateCnt interface=$lteInf];
-:set ispGateOk ($ispGatePing > 0);
-:set lteGateOk ($lteGatePing > 0);
-:put "ispGateOk=$ispGateOk";
-:put "lteGateOk=$lteGateOk";
-#--Ping ISP 
-if (!$ispGateOk) do={
-    /log warning "ISP-Gate DOWN (Status)";
-} else={
-    foreach k in=$pingHost do={
-        :local res [$Ping [$Resolve $k] count=$pingHostCnt interface=$ispInf];
-        :set ispPing ($ispPing + $res);
-    }
-    :set ispInetOk ($ispPing > 0);
-    :put "ispInetOk=$ispInetOk";
-    if (!$ispInetOk) do={
-        /log warning "ISP DOWN (Status)";
-    }
+:global HostPing do={
+    ## Value required: host; count; [interface]
+    :global Ping; :global Resolve; :local res 0;
+    :foreach k in=$host do={:set res ($res + [$Ping [$Resolve $k] count=$count interface=$interface]);};
+    :return $res;
 }
-#--Ping LTE 
-if (!$lteGateOk) do={
-    /system routerboard usb power-reset duration=3s;
-    /log warning "LTE-Gate DOWN (Status)";
+
+## Ping ISP
+## ISP-gate ping Step-1 
+:if ([/ping $pingISPGate count=$pingGateCnt interface=$ispInf] = 0) do={
+    :delay 5s;
+    ## ISP-gate ping Step-2 
+    :if ([/ping $pingISPGate count=$pingGateCnt interface=$ispInf] = 0) do={
+        /log warning "ISP-Gate DOWN (Status)";
+    };
 } else={
-    # foreach k in=$pingHostWake do={
-    #     /ping $k count=3 interface=$lteInf;
-    # }
-    # :delay 3s;
-    foreach k in=$pingHost do={
-        :local res [$Ping [$Resolve $k] count=$pingHostCnt interface=$lteInf];
-        :set ltePing ($ltePing + $res);
-    }
-    :set lteInetOk ($ltePing > 0);
-    :put "lteInetOk=$lteInetOk";
-    if (!$lteInetOk) do={
-        /log warning "LTE DOWN (Status)";
-    }
+    ## ISP ping Step-1 
+    :if ([$HostPing host=$pingHost count=$pingHostCnt interface=$ispInf] = 0) do={
+        :delay 5s;
+         ## ISP ping Step-2 
+        :if ([$HostPing host=$pingHost count=$pingHostCnt interface=$ispInf] = 0) do={  
+            /log warning "ISP DOWN (Status)";
+        };
+    };
+}
+## Ping LTE 
+## LTE-gate ping Step-1 
+:if ([/ping $pingLTEGate count=$pingGateCnt interface=$lteInf] = 0) do={
+    :delay 5s;
+    ## LTE-gate ping Step-2 
+    :if ([/ping $pingLTEGate count=$pingGateCnt interface=$lteInf] = 0) do={
+        /system routerboard usb power-reset duration=3s;
+        /log warning "LTE-Gate DOWN (Status)";
+    };
+} else={
+    ## LTE ping Step-1 
+    :if ([$HostPing host=$pingHost count=$pingHostCnt interface=$lteInf] = 0) do={
+        :delay 5s;
+        ## LTE ping Step-2 
+        :if ([$HostPing host=$pingHost count=$pingHostCnt interface=$lteInf] = 0) do={
+            /log warning "LTE DOWN (Status)";
+        };
+    };
 }
