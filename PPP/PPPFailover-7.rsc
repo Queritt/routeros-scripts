@@ -1,11 +1,9 @@
 # PPP Failover by list
-# 0.3
-# ROS 7.x
-# 2023/01/04
+# 0.4 / 7.x
+# 2023/01/16
 #--Changing server
 
 :global Ping do={
-    # Use where count less then 3
     :local pingAddress $1;
     :local pingCount $count;
     :local pingInf $interface;
@@ -94,21 +92,21 @@
 :local main1InfPing 0;
 :local main2InfPing 0;
 #--Provider link
-#--yandex.ru, Cloudflare, GoogleDNS, mail.ru
-:local pingHost {87.250.250.242; 1.1.1.1; 8.8.8.8; 94.100.180.200};
+#--yandex.ru, google.com, youtube.com, mail.ru
+:local pingHost {87.250.250.242; 64.233.164.101; 142.250.186.78; 94.100.180.200};
 :local ispPing 0;
 :foreach host in=$pingHost do={ :local res [$Ping $host count=1]; :set ispPing ($ispPing + $res); };
 :if ($ispPing < 3) do={ :return [] };
 #--Client link
 foreach host in=$pingHost do={
-    :local res [$Ping $host count=2 interface=$main1Inf];
+    :local res [$Ping $host count=1 interface=$main1Inf];
     :set main1InfPing ($main1InfPing + $res);
-    :local res [$Ping $host count=2 interface=$main2Inf];
+    :local res [$Ping $host count=1 interface=$main2Inf];
     :set main2InfPing ($main2InfPing + $res);
 }
-:if ($main1InfPing < 5) do={
+:if ($main1InfPing = 0) do={
     /log warning [$ChangeServer $providerName $main1Inf "PPP-OUT-1" "Main1" $main1InfPreferList $InfOneList];
 }
-:if ($main2InfPing < 5) do={
+:if ($main2InfPing = 0) do={
     /log warning [$ChangeServer $providerName $main2Inf "PPP-OUT-2" "Main2" $main2InfPreferList $InfOneList];
 }
