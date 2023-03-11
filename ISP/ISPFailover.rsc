@@ -1,7 +1,7 @@
-# ispFailover 
-# BGP edition
-# ver 0.60
-# modified 2023/01/05
+# ISPFailover 
+# BGP; Alcatel
+# ver 0.70 / 6.x
+# modified 2023/01/16
 :global ispInf ether1;
 :global lteInf lte1;
 :global ispFailCnt;
@@ -11,7 +11,7 @@
 :local pingCount 1;
 # yandex.ru, cloudflare, GoogleDNS, mail.ru
 :local pingHost {87.250.250.242; 1.1.1.1; 8.8.8.8; 94.100.180.200};
-:local pingHostWake 8.8.8.8; 
+# :local pingHostWake 8.8.8.8; 
 :local ispInetOk false;
 :local lteInetOk false;
 :local ispPing 0;
@@ -24,6 +24,9 @@
     #/ ip firewall connection remove [find];
     # /ip route set [find comment="LTE"] distance=4;
     /ip route set $lteId distance=4;
+    # /ip firewall connection remove [find];
+    :foreach i in=[/ip firewall connection find protocol~"tcp"] do={ /ip firewall connection remove $i };
+    :foreach i in=[/ip firewall connection find protocol~"udp"] do={ /ip firewall connection remove $i };
     /queue tree disable [find comment="LTE"];
     /queue tree enable [find comment="ISP-100"];
     /ip firewall raw disable [find comment="WEB-LTE"]; 
@@ -43,6 +46,9 @@
     :delay 1s; 
     # /ip route set [find comment="LTE"] distance=1;
     /ip route set $lteId distance=1;
+    # /ip firewall connection remove [find];
+    :foreach i in=[/ip firewall connection find protocol~"tcp"] do={ /ip firewall connection remove $i };
+    :foreach i in=[/ip firewall connection find protocol~"udp"] do={ /ip firewall connection remove $i };
     /queue tree disable [find comment="ISP-100"];
     /queue tree enable [find comment="LTE"];
     #/ ip firewall connection remove [find];
@@ -89,7 +95,6 @@ if ($ispInetOk) do={
             :if ( ! $ispFail ) do={
                 $SwitchToISP; 
             } else={
-                # /ip route set [find comment="LTE"] distance=4;
                 /ip route set $lteId distance=4;
                 :set ispFail false;
                 /log warning "ISP UP";
@@ -106,8 +111,8 @@ if ($ispInetOk) do={
         :put "ispFailCnt k=$ispFailCnt";
         :if ($ispFailCnt = $failTreshold) do={
             :if ( $lteInfOk ) do={
-                /ping $pingHostWake count=$pingCount interface=$lteInf;
-                delay 3s;
+                # /ping $pingHostWake count=$pingCount interface=$lteInf;
+                # delay 3s;
                 foreach k in=$pingHost do={
                     :local res [/ping $k count=$pingCount interface=$lteInf];
                     :set ltePing ($ltePing + $res);
@@ -118,7 +123,6 @@ if ($ispInetOk) do={
                     $SwitchToLTE;
                 }
             } else={
-                # /ip route set [find comment="LTE"] distance=1;
                 /ip route set $lteId distance=1;
                 /log warning "ISP DOWN";
                 :set ispFail true;
@@ -127,8 +131,8 @@ if ($ispInetOk) do={
     } 
     if ( ($ispFailCnt > $failTreshold) && ($lteGateDist = 4) ) do={
         :if ( $lteInfOk ) do={
-            /ping $pingHostWake count=$pingCount interface=$lteInf;
-            :delay 3s;
+            # /ping $pingHostWake count=$pingCount interface=$lteInf;
+            # :delay 3s;
             :foreach k in=$pingHost do={
                 :local res [/ping $k count=$pingCount interface=$lteInf]
                 :set ltePing ($ltePing + $res);
