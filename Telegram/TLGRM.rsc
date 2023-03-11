@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=81945#p81945
 # tested on ROS 6.49
 # updated 2022/02/08
-# modified 2022/05/26
+# modified 2022/05/31
 
 :do {
     :local botID    "botXXXXXXXXXXXXX";
@@ -11,18 +11,6 @@
     :local launchScr true;
     :local launchFnc false;
     :local launchCmd false;
-
-     # Function of checking access of script
-
-    :local CheckScript do={
-        :local AcceptScript {"WoL"; "ClearLog"; "GetExIP"};
-        :foreach ScriptName in=$AcceptScript do={
-            :if ($msg = $ScriptName) do={
-                :return 1
-            } 
-        }
-        :return 0
-    }
 
     # Function of searching comments for MAC-address
     # https://forummikrotik.ru/viewtopic.php?p=73994#p73994
@@ -259,10 +247,10 @@
                         :log warning ("Telegram user $userName launches function '$msgTxt'.");
                         [:parse ":global $msgTxt; [\$$msgTxt $restline]"];
                     }
-                    :if ([/system script find name=$msgTxt;]!="" && $launchScr=true && [$CheckScript msg=$msgTxt]) do={
+                    :if ([/system script find name=$msgTxt;]!="" && $launchScr=true) do={
                         :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Telegram user $userName activates script '$msgTxt'.");
-                        :log warning ("Telegram user $userName activates script '$msgTxt'.");
-                        /system script run $msgTxt;
+                        :log info ("Telegram user $userName activates script '$msgTxt'.");
+                        [[:parse "[:parse [/system script get $msgTxt source]] $restline"]];
                     }
                     :if ([/system script find name=$msgTxt;]="" && [/system script environment find name=$msgTxt;]="" && $launchCmd=true) do={
                         :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Telegram user $userName is trying to execute command '$msgTxt'.");
@@ -277,8 +265,8 @@
     # Part of the script body for notifications in Telegram
     # https://www.reddit.com/r/mikrotik/comments/onusoj/sending_log_alerts_to_telegram/
     :local outMsg "";
-    :local logGet [ :toarray [ /log find ($topics ~"warning" || $topics ~"error" || $topics ~"critical" || $topics ~"caps" \
-    || $topics ~"wireless" || $message ~"logged in"); ]];
+    :local outMsgEmail "";
+    :local logGet [ :toarray [ /log find ($topics ~"warning" || $topics ~"error" || $topics ~"critical"); ]];
     :local logCnt [ :len $logGet ];
     :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - *** Stage of sending notifications to Telegram:");
     :if ([:len $timeLog] = 0) do={ 
@@ -309,11 +297,11 @@
         :if (([:len $timeLog] < 1) || (([:len $timeLog] > 0) && ($timeLog != $lastTime) && ([:len $outMsg] > 8) )) do={
             :set timeLog $lastTime;
             :if ([:len $outMsg] > 4096) do={ :set outMsg ([:pick $outMsg 0 4096]); }
+            :set outMsgEmail $outMsg;
+            :set outMsgEmail ("$nameID".": "."$outMsg"." ");
             :set outMsg [$CP1251toUTF8 $outMsg];
             :set outMsg ("$Emoji "."$nameID".":"."%0A"."$outMsg");
-            :local urlString ("https://api.telegram.org/$botID/sendmessage\?chat_id=$myChatID&text=$outMsg");
-            :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Generated string for Telegram:\r\n".$urlString);
-            /tool fetch url=$urlString as-value output=user;
+            [[:parse [/system script get TG source]] Text=$outMsg EmailText=$outMsgEmail]
         } else={ :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - There are no log entries to send."); }
     } else={ :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - Necessary log entries were not found."); }
     :put ("$[$UnixTimeToFormat ([$EpochTime] + $timeOf) 1] - End of TLGRM-script on '$nameID' router.");
