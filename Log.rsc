@@ -1,7 +1,7 @@
 ## Log
-## 0.11
-## 2023/03/09
-## Add unwanted message remove
+## 0.12
+## 2023/03/11
+## Change of reset func
 
 :local SendMsg do={
     :local nameID [/system identity get name;];
@@ -17,8 +17,9 @@
 }
 
 :local ResetLog do={
+    :local curLen [/system logging action get memory memory-lines];
     /system logging action set memory memory-lines=1; 
-    /system logging action set memory memory-lines=1000; 
+    /system logging action set memory memory-lines=$curLen; 
     :return (" Log reseted.");
 }
 
@@ -114,15 +115,15 @@
         ## Line Numbers
         :if ([:typeof $lineNum]="nothing" || $lineNum~"[1-9]") do={:put ""} else={$SendMsg (" Log: "."\"$lineNum\""." - not allowed numbers, try again..."); return [];}; 
         ## NOTHING
-        :if ([:typeof $option] = "nothing") do={:if ([:len $startBuf] >= 100) do={:set start ([:len $startBuf] - 100);}};
+        :if ([:typeof $option] = "nothing") do={:if ([:len $startBuf] >= 50) do={:set start ([:len $startBuf] - 50);}};
         ## HEAD
         :if ($option = "head") do={
-            :if ([:typeof $lineNum] = "nothing") do={:if ([:len $startBuf] >= 50) do={:set end 49;}};
+            :if ([:typeof $lineNum] = "nothing") do={:if ([:len $startBuf] >= 20) do={:set end 19;}};
             :if ($lineNum~"[1-9]") do={:if ($lineNum < [:len $startBuf]) do={:set end ($lineNum -1);}};
         };
         ## TAIL
         :if ($option = "tail") do={
-            :if ([:typeof $lineNum] = "nothing") do={:if ([:len $startBuf] >= 50) do={:set start ([:len $startBuf] - 50);}};
+            :if ([:typeof $lineNum] = "nothing") do={:if ([:len $startBuf] >= 20) do={:set start ([:len $startBuf] - 20);}};
             :if ($lineNum~"[1-9]") do={:if ($lineNum < [:len $startBuf]) do={:set start ([:len $startBuf] - $lineNum)};};
         };
         :for n from=$start to=$end do={
