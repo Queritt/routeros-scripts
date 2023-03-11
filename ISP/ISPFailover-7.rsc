@@ -1,7 +1,8 @@
 # ISPFailover 
-# ver 0.80 / 7.x
-# Add resolver for hosts
-# modified 2023/01/18
+# ver 0.81 / 7.x
+# Add global value for ping host
+# modified 2023/01/23
+# Run every 20s
 :global ispInf ether1;
 :global lteInf lte1;
 :global ispFailCnt;
@@ -9,10 +10,8 @@
 :global lteId;
 :local lteInfOk [/interface find name=lte1];
 :local pingCount 1;
-# yandex.ru, cloudflare, GoogleDNS, mail.ru
-# :local pingHost {87.250.250.242; 1.1.1.1; 8.8.8.8; 94.100.180.200};
 # :local pingHostWake 8.8.8.8; 
-:local pingHost {"yandex.ru"; "google.com"; "mail.ru"};
+:global pingHost {"yandex.ru"; "google.com"; "mail.ru"};
 :local ispInetOk false;
 :local lteInetOk false;
 :local ispPing 0;
@@ -39,10 +38,7 @@
 
 :local SwitchToISP do={
     :global lteId;
-    #/ ip firewall connection remove [find];
-    # /ip route set [find comment="LTE"] distance=4;
     /ip route set $lteId distance=4;
-    # /ip firewall connection remove [find];
     :foreach i in=[/ip firewall connection find protocol~"tcp"] do={ /ip firewall connection remove $i };
     :foreach i in=[/ip firewall connection find protocol~"udp"] do={ /ip firewall connection remove $i };
     /queue tree disable [find comment="LTE"];
@@ -50,11 +46,11 @@
     /ip firewall raw disable [find comment="WEB-LTE"]; 
     /interface disable l2tp-out1;
     /interface disable l2tp-out2;
-    # /interface disable l2tp-out5;
+    # /interface disable l2tp-out3;
     :delay 2s;
     /interface enable l2tp-out1;
     /interface enable l2tp-out2;
-    # /interface enable l2tp-out5;
+    # /interface enable l2tp-out3;
     :delay 2s
     /log warning "ISP UP | Switched to main internet connection";
 }
@@ -62,22 +58,19 @@
 :local SwitchToLTE do={
     :global lteId;
     :delay 1s; 
-    # /ip route set [find comment="LTE"] distance=1;
     /ip route set $lteId distance=1;
-    # /ip firewall connection remove [find];
     :foreach i in=[/ip firewall connection find protocol~"tcp"] do={ /ip firewall connection remove $i };
     :foreach i in=[/ip firewall connection find protocol~"udp"] do={ /ip firewall connection remove $i };
     /queue tree disable [find comment="ISP-100"];
     /queue tree enable [find comment="LTE"];
-    #/ ip firewall connection remove [find];
     /ip firewall raw enable [find comment="WEB-LTE"]; 
     /interface disable [find name="l2tp-out1"];
     /interface disable [find name="l2tp-out2"];
-    # /interface disable [find name="l2tp-out5"];
+    # /interface disable [find name="l2tp-out3"];
     :delay 2s;
     /interface enable [find name="l2tp-out1"];
     /interface enable [find name="l2tp-out2"];
-    # /interface enable [find name="l2tp-out5"];
+    # /interface enable [find name="l2tp-out3"];
     :delay 2s;
     /log warning "ISP DOWN | Switched to reserve internet connection";
 }
@@ -95,7 +88,6 @@
     :set lteId [/ip route find comment="LTE"];
     :if ($bgpStatus) do={ /routing bgp connection enable [find comment="antifilter.download"]; }
 }
-# :set lteGateDist [/ip route get [find comment="LTE"] distance];
 :set lteGateDist [/ip route get $lteId distance];
 :put "lteGateDist=$lteGateDist";
 # Check ISP ping
