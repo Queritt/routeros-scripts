@@ -1,6 +1,6 @@
 # PPP client management
-# ver 0.25
-# modified 2022/09/07
+# ver 0.26
+# modified 2022/10/13
 #---Function of sending message to telegram bot
 :local SendMsg do={
     :local  nameID [ /system identity get name; ];
@@ -18,16 +18,12 @@
 }
 #---Function of renaming PPP-client coment
 :local Rename do={
-    :local notAccessList {"PDA"; "PPP-OUT-2"; "WM"; "RDP"; "Reserved"; "OVPN"; "SSTP"}
+    :local notAccessList {"PDA"; "PC-PPP-OUT-2"; "WM"; "RDP"; "Reserved"; "OVPN"; "SSTP"}
     :local oldName $1;
     :local newName $2;
+    :if ( [:typeof [:find $notAccessList $oldName]] != "nil" ) do={ :return ("PPP rename error: editing "."\"$oldName\""." denied!"); }
     :local clientPPP [ /ppp secret find (comment="$oldName") ];
     if ([:len $clientPPP] > 0) do={
-        :foreach n in=$notAccessList do={ 
-            :if ($n = $oldName) do={
-                :return ("PPP rename error: editing "."\"$oldName\""." denied!");
-            } 
-        }
         :if ($newName = "nouse") do={
             :set newName [/ppp secret get $clientPPP name]; 
         }
@@ -46,11 +42,11 @@
         :local clientName [/ppp secret get [find comment="$newName"] name];
         /log info ("$clientName".": "."\"$oldName\""." to "."\"$newName\""." successfully renamed.");
         :return ("$clientName".": "."\"$oldName\""." to "."\"$newName\""." successfully renamed.");
-    } else={ :return "PPP print error: \"$oldName\" not found! Try again..."; }
+    } else={ :return "PPP rename error: \"$oldName\" not found! Try again..."; }
 }
 #---Function of printing PPP-client information
 :local Print do={
-    :local notAccessList {"PDA"; "PPP-OUT-2"; "WM"; "RDP"; "Reserved"; "OVPN"; "SSTP"};
+    :local notAccessList {"PDA"; "PC-PPP-OUT-2"; "WM"; "RDP"; "Reserved"; "OVPN"; "SSTP"};
     :local nameClient $1;
     :local tempName;
     :local tempComment;
@@ -78,11 +74,9 @@
             }
             #---PASWORD
             :if ($2 = "pass" || $3 = "pass" || $4 = "pass" || $5 = "pass" || $6 = "pass") do={
-                :foreach n in=$notAccessList do={ 
-                    :if ($n = $tempComment) do={
-                        :set tempArgument "denied";
-                    } else={ :set tempArgument [/ppp secret get [:pick $clientPPP ($i)] password;] }
-                }
+                :if ( [:typeof [:find $notAccessList $tempComment]] = "nil" ) do={
+                  :set tempArgument [/ppp secret get [:pick $clientPPP ($i)] password;]
+                } else={ :set tempArgument "denied"; }
                 :set tempString ("$tempString"." > pass: "."$tempArgument"."%0A");
             } 
             #---LAST-CALLER-ID
@@ -144,6 +138,7 @@
 }
 #---Function of setting NAT
 :local SetAdd do={
+    :local notAccessList {"PDA"; "PC-PPP-OUT-2"; "WM"; "RDP"; "Reserved"; "OVPN"; "SSTP"};
     :local action $1;
     :local target $2;
     :local nameClient $3;
@@ -200,6 +195,9 @@
         } on-error={ :return "$target $action error: wrong protocol or port! Try again..."; }
     }
     :if ( $target = "pass" ) do={
+        :if ( [:typeof [:find $notAccessList $clientComment]] != "nil" ) do={ 
+          :return ("PPP password error: editing "."\"$clientComment\""." denied!"); 
+        }
         :if ( [:len $port] = 0 ) do={ :return ("Password is empty. Try again..."); }
         [:parse ("ppp secret $action [find comment=$clientComment] password=$port")];
         :return ("PPP: " . $nameClient . " password successfully changed."); 
