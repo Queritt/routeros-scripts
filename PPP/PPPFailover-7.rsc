@@ -1,7 +1,7 @@
 ## PPPFailover
-## 0.82 / 7.x
+## 0.83 / 7.x
 ## 2023/03/05
-## RenewList fills into every server changing; Added random server finding if not found prefer country;
+## RenewList fills into every server changing; Added random server finding if not found prefer country; Added ping threshold func;
 ## Changing server from file
 ## File in flash and contains name as "providerName" value
 
@@ -21,6 +21,23 @@
     :global Ping; :global Resolve; :local res 0;
     :foreach k in=$host do={:set res ($res + [$Ping [$Resolve $k] count=$count interface=$interface]);};
     :return $res;
+}
+
+:global PingLevel do={
+    ## Value required: $1(address);
+    :local suitePing 70; :local res; :local tmp; :local tmpSym; :local tmpStr; :local pingCnt 0;
+    :for i from=1 to=3 do={
+        :set tmpStr "";;
+        :set tmp ([:ping $1 count=1 as-value]->"time");
+        :if ([:typeof $tmp] != "nothing") do={:set pingCnt ($pingCnt + 1)};
+        :for n from=0 to=([:len $tmp] -1) do={
+            :set tmpSym [:pick $tmp $n];
+            :if ($tmpSym~"[0-9]") do={:set tmpStr ($tmpStr.$tmpSym)};
+        }
+        :set res ($res + ([:tonum $tmpStr] / 1000));
+    }
+    :if ([:typeof $res] = "nil") do={:return false};
+    :if (($res / $pingCnt) > $suitePing) do={:return false}; :return true;
 }
 
 :local FileToArray do={
@@ -69,6 +86,7 @@
     :local oneListClient $5;
     :local renewList $6;
     :local existAddress ({});
+    :global PingLevel;
     :global main1Renew;
     :global main2Renew;
     :global serverList;
@@ -89,7 +107,8 @@
             :set suiteStatus ($preferCountry = $country);
             :if ($suiteStatus) do={ :set suiteStatus ([:typeof [:find $existAddress $address]] = "nil") };
             :if ($suiteStatus) do={ :set suiteStatus ([:typeof [:find $renewList "$address"]] != "num") };
-            :if ($suiteStatus) do={ :set suiteStatus ([/ping address=$address count=3] > 0) };
+            :if ($suiteStatus) do={ :set suiteStatus [$PingLevel $address] };
+            # :if ($suiteStatus) do={ :set suiteStatus ([/ping address=$address count=3] > 0) };
             :if ($suiteStatus) do={
                 :set curAddress [/interface l2tp-client get $clientName connect-to];
                 :local tempComment ($clientComment . "-" . $providerName . "-" . $country . ", " . $city);
@@ -125,7 +144,8 @@
             :set city    [:pick $n 2];
             :set suiteStatus ([:typeof [:find $existAddress $address]] = "nil");
             :if ($suiteStatus) do={ :set suiteStatus ([:typeof [:find $renewList "$address"]] != "num") };
-            :if ($suiteStatus) do={ :set suiteStatus ([/ping address=$address count=3] > 0) };
+            :if ($suiteStatus) do={ :set suiteStatus [$PingLevel $address] };
+            # :if ($suiteStatus) do={ :set suiteStatus ([/ping address=$address count=3] > 0) };
             :if ($suiteStatus) do={
                 :set curAddress [/interface l2tp-client get $clientName connect-to];
                 :local tempComment ($clientComment . "-" . $providerName . "-" . $country . ", " . $city);
