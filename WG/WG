@@ -1,0 +1,261 @@
+# WG peer management
+# ver 0.1
+# modified 2022/10/14
+#---Function of sending message to telegram bot
+:local SendMsg do={
+    :local  nameID [ /system identity get name; ];
+    [[:parse [/system script get TG source]] Text=("$nameID:"."%0A"."$1")];
+}
+#---Function of showing information about available commands
+:local Help do={
+    :local help ("WG options: "."%0A". \
+        " > print [name/all; time; key; call; netwatch; nat]"."%0A". \
+        " > rename [oldname; newname/nouse]"."%0A". \
+        " > set/add [nat; name; \"80/445/udp\"]"."%0A". \
+        " > set [key; name; key without symbol / gen  ]"."%0A". \
+        " > enable/disable/remove [netwatch/nat; name]");
+    :return $help;
+}
+#---Function of renaming PPP-client coment
+:local Rename do={
+    :local notAccessList {"PDA"; "PC-PPP-OUT-2"; "WM"; "RDP"; "Reserved"};
+    :local oldName $1;
+    :local newName $2;
+    :local clientWG [ /interface wireguard peers find (comment="$oldName") ];
+    :if ( [:typeof [:find $notAccessList $oldName]] != "nil" ) do={
+        :return ("WG rename error: editing "."\"$oldName\""." denied!");
+    }
+    if ([:len $clientWG] > 0) do={
+        :if ($newName = "nouse") do={
+            :local tempAddress [ /interface wireguard peers get $clientWG allowed-address; ];
+            :set tempAddress [:tostr [:pick $tempAddress 0]];
+            :set newName ("Test-".[:pick $tempAddress 0 [:find $tempAddress "/" -1]]); 
+        }
+        #---change secret
+        /interface wireguard peers set $clientWG comment=$newName;
+        #---change netwatch
+        :if [/tool netwatch find comment=$oldName] do={
+            /tool netwatch set [find comment="$oldName"] comment=$newName;
+        }
+        #---change NAT
+        :if  [/ip firewall nat find comment=$oldName] do={
+            /ip firewall nat set [find comment=$oldName] comment=$newName;
+        }
+        # :local clientName [/ppp secret get [find comment="$newName"] name];
+        /log info ("$newName".": "."\"$oldName\""." to "."\"$newName\""." successfully renamed.");
+        :return ("$newName".": "."\"$oldName\""." to "."\"$newName\""." successfully renamed.");
+    } else={ :return "WG rename error: \"$oldName\" not found! Try again..."; }
+}
+#---Function of printing PPP-client information
+:local Print do={
+    :local notAccessList {"PDA"; "PC-PPP-OUT-2"; "WM"; "Reserved"};
+    :local nameClient $1;
+    :local tempName;
+    :local tempComment;
+    :local tempAddress;
+    :local tempArgument;
+    :local tempString "";
+    :local clientWG;
+    :if ($nameClient = "all" || $nameClient = "ALL") do={ 
+        :set clientWG [ /interface wireguard peers find interface~"server" ];
+    } else={ :set clientWG [ /interface wireguard peers find comment ~"$nameClient" ]; }
+    :if ([:len $clientWG] > 0) do={
+        :for i from=0 to=([:len $clientWG] - 1) do={
+            :set tempComment [ /interface wireguard peers get [:pick $clientWG ($i)] comment; ];
+            :set tempAddress [ /interface wireguard peers get [:pick $clientWG ($i)] allowed-address; ];
+            :set tempString  ("$tempString"."$tempComment".":"."%0A"." > addr: "."$tempAddress"."%0A");
+            #---LAST-HANDSHAKE
+            :if ($2 = "time" || $3 = "time" || $4 = "time" || $5 = "time" || $6 = "time") do={
+                :set tempArgument [/interface wireguard peers get [:pick $clientWG ($i)] last-handshake; ];
+                :if ( [:len $tempArgument] = 0) do={ :set tempArgument "00:00:00"}
+                :set tempString ("$tempString"." > up: "."$tempArgument"."%0A");
+            }
+            #---KEY
+            :if ($2 = "key" || $3 = "key" || $4 = "key" || $5 = "key" || $6 = "key") do={
+                :if ( [:typeof [:find $notAccessList $tempComment]] = "nil" ) do={
+                    :set tempArgument [/interface wireguard peers get [:pick $clientWG ($i)] public-key;];
+                    ##--Swap symbol "+/" to URL-table 
+                    :local tmpStr "";
+                    :for i from=0 to=([:len $tempArgument]-1) step=1 do={
+                    	:local tmpChar [:pick $tempArgument $i];
+                    	:if ( $tmpChar = "+") do={:set tmpChar "%2b"};
+                    	:if ( $tmpChar = "/") do={:set tmpChar "%2f"};
+                    	:set tmpStr ("$tmpStr"."$tmpChar");
+                    	/log info $tmpStr;
+                    }
+                    :set tempArgument $tmpStr;
+                } else={ :set tempArgument "denied"; }
+                :set tempString ("$tempString"." > key: "."$tempArgument"."%0A");
+            } 
+            #---LAST-CALLER-ID
+            :if ($2 = "call" || $3 = "call" || $4 = "call" || $5 = "call" || $6 = "call") do={
+                :set tempArgument [/interface wireguard peers get [:pick $clientWG ($i)] current-endpoint-address;]
+                :if ( [:len $tempArgument] = 0 ) do={ :set tempArgument "inactive";}
+                :set tempString ("$tempString"." > last-caller: "."$tempArgument"."%0A");
+            }
+            #---Netwatch
+            :if ($2 = "netwatch" || $3 = "netwatch" || $4 = "netwatch" || $5 = "netwatch" || $6 = "netwatch") do={
+                :if ( [ /tool netwatch find comment="$tempComment"; ] ) do={
+                    :if ( [ /tool netwatch find comment="$tempComment" disabled=no; ] ) do={
+                        :set tempString ("$tempString"." > Netwatch existed and enabled"."%0A");
+                    } else={
+                        :set tempString ("$tempString"." > Netwatch existed and disabled"."%0A");
+                    }
+                } else={
+                    :set tempString ("$tempString"." > Netwatch not existed"."%0A");
+                }
+            }
+            #---NAT
+            :if ($2 = "nat" || $3 = "nat" || $4 = "nat" || $5 = "nat" || $6 = "nat") do={
+            # :if ($1 = "nat" || $2 = "nat" || $3 = "nat" || $4 = "nat" || $5 = "nat") do={
+                :if ( [ /ip firewall nat find comment="$tempComment"; ] ) do={
+                    :local port [ /ip firewall nat get [find comment="$tempComment"] dst-port; ]
+                    :if ( [ /ip firewall nat find comment="$tempComment" disabled=no; ] ) do={
+                        :set tempString ("$tempString"." > NAT existed and enabled; Port: "."$port"."%0A");
+                    } else={
+                        :set tempString ("$tempString"." > NAT existed and disabled; Port: "."$port"."%0A");
+                    }
+                } else={
+                        :set tempString ("$tempString"." > NAT not existed"."%0A");
+                }
+            }
+        }
+        :return $tempString;
+    } else={ :return "WG print error: \"$nameClient\" not found! Try again..."; }
+}
+#---Function of Enabling Disabling Removing PPP-client information
+:local EnableDisableRemove do={
+    :local action $1;
+    :local target $2;
+    :local nameClient $3;
+    :local clientWG [ /interface wireguard peers find (comment="$nameClient") ];
+    :if ([:len $clientWG] > 0) do={
+        :if ($target = "netwatch") do={
+            :if [ /tool netwatch find comment="$nameClient"; ] do={
+                [:parse ("tool netwatch $action [find comment=$nameClient]")];
+                :return ($nameClient." netwatch successfully "."$action"."d"); 
+            } else={ :return "$target error: \"$nameClient\" not exist! Try again..."; }
+        } 
+        :if ($target = "nat") do={
+            :if [ /ip firewall nat find comment="$nameClient"; ] do={
+                [:parse ("ip firewall nat $action [find comment=$nameClient]")];
+                :return ($nameClient." nat successfully "."$action"."d"); 
+            } else={ :return "$target error: \"$nameClient\" not exist! Try again..."; }
+        }  
+        :return "WG Edit error: \"$target\" not recognized! Try again..."; 
+    } else={ :return "Edit error: client \"$nameClient\" not found! Try again..."; }
+}
+#---Function of setting NAT
+:local SetAdd do={
+    :local action $1;
+    :local target $2;
+    :local nameClient $3;
+    :local port $4;
+    :local protocol "tcp";
+    :local notAccessList {"PDA"; "PC-PPP-OUT-2"; "WM"; "RDP"; "Reserved"};
+    :local clientWG [ /interface wireguard peers find (comment="$nameClient") ];
+    :if ([:len $clientWG] = 0) do={
+        :return "Set error: peer \"$nameClient\" not found! Try again..."; 
+    }
+    :local peerAddress [ /interface wireguard peers get $clientWG allowed-address; ];
+    :set peerAddress [:tostr [:pick $peerAddress 0]];
+    :set peerAddress [:pick $peerAddress 0 [:find $peerAddress "/" -1]]; 
+    :local externalAddress [ /ip address get [find interface="ether1"] address; ];
+    :set externalAddress [:pick $externalAddress 0 [:find $externalAddress "/" -1]];
+    #--- Nat Set
+    :if ( ($target = "nat") && ([:len $port] > 0) ) do={
+        #--- Replacing "/" to ","
+        :local string $port;
+        :local newString "";
+        :if ([:find $string "/" -1] > 0) do={
+            :for i from=0 to=([:len $string] -1) step=1 do={
+                :local actualchar [:pick $string $i];
+                :if ($actualchar = "/") do={ :set actualchar "," };
+                :set newString ($newString.$actualchar);
+            }  
+            :set port $newString; 
+        }
+        #--- Spliting protocol/port 
+        :if ( $port~"[a-zA-Z]" ) do={
+            :local flag "";
+            :local int 0;
+            :while ( ([:len $flag] = 0) && ($int < [:len $port]) ) do={
+                :local actualchar [:pick $port $int];
+                :if ($actualchar~"[a-zA-Z]") do={ 
+                    :set flag $int;
+                }
+                :set int ($int + 1);
+            }
+            :set protocol [ :pick $port $flag [:len $port] ];
+            :set port [ :pick $port 0 ($flag - 1) ];
+        }
+        :if ( $action = "set" && [ /ip firewall nat find comment="$nameClient"; ] = 0 ) do={ 
+            :return "$target set error: \"$nameClient\" not exist! Try again..."; 
+        }
+        :if ( $action = "add" && [ /ip firewall nat find comment="$nameClient"; ] ) do={ 
+            :return "$target set error: \"$nameClient\" already exist! Try again..."; 
+        }
+        :do {
+            :if ( $action = "set" ) do={ 
+                [:parse ("ip firewall nat $action [find comment=$nameClient] dst-port=$port protocol=$protocol")];
+                :return ($nameClient." nat $port/$protocol successfully set"); 
+            } 
+            :if ( $action = "add" ) do={ 
+                [:parse ("ip firewall nat $action action=dst-nat chain=dstnat comment=$nameClient dst-address=$externalAddress \
+                    dst-port=$port in-interface=ether1 protocol=$protocol to-addresses=$peerAddress")];
+                :return ($nameClient." nat $port/$protocol successfully added"); 
+            }
+        } on-error={ :return "$target $action error: wrong protocol or port! Try again..."; }
+    }
+    ##--Set key
+    :if ( $action = "set" ) do={
+        :if ( [:typeof [:find $notAccessList $nameClient]] != "nil" ) do={
+          :return ("WG key error: editing "."\"$nameClient\""." denied!");
+        }
+        :if ( [:len $port] = 0 ) do={ :return ("Key is empty. Try again..."); }
+        ##--GEN NEW
+        :if ( $port = "gen" ) do={
+        	:local keyArray [[:parse [/system script get WGKeyGen source]]];
+        	:local privateKey [:pick $keyArray 0];
+        	:local publicKey [:pick $keyArray 1];
+        	:do {
+        		[:parse ("interface wireguard peers set $clientWG public-key=\"$publicKey\"")];
+        	} on-error={ :return ("WG generating key error: something went wrong."); }
+        	:return ("WG: " . $nameClient . " key successfully changed." . "%0A" . " > Key1: " . $privateKey . "%0A" . " > Key2: " . $publicKey); 
+        }
+        ##--SET
+        :set port ("$port" . "=");
+        :do {
+        	[:parse ("interface wireguard peers $action $clientWG public-key=\"$port\"")];
+        } on-error={ :return ("WG setting error: key not correct or already exists."); }
+        :return ("WG: " . $nameClient . " key successfully changed."); 
+    }
+    :return "Set error: option \"$target\" or port not recognized! Try again..."; 
+}
+#---MAIN---#
+#---Print
+:if ($0 = "print") do={
+    :if ($1 != null) do={
+        $SendMsg [ $Print $1 $2 $3 $4 $5 $6 ]; return [];
+    } else={ $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; } 
+} 
+#---Rename
+:if ($0 = "rename") do={
+    :if ($2 != null) do={
+        $SendMsg [ $Rename $1 $2 ]; return [];
+    } else={ $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; } 
+} 
+#---Enable, disable, remove
+:if ($0 = "enable" || $0 = "disable" || $0 = "remove") do={
+    :if ($2 != null) do={ 
+        $SendMsg [ $EnableDisableRemove $0 $1 $2 ]; return [];
+    } else={ $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; } 
+} 
+#---Set, Add
+:if ($0 = "set" || $0 = "gen" || $0 = "add") do={
+    :if ($2 != null) do={ 
+        $SendMsg [ $SetAdd $0 $1 $2 $3 ]; return [];
+    } else={ $SendMsg ("PPP $0 error: not enough arguments. Try again..."); :return []; } 
+} 
+#---Help
+$SendMsg [$Help];
