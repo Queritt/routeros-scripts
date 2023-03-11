@@ -1,14 +1,16 @@
-# LTE status
-# 0.30 / 7.x
-# 2023/01/17
+# LTEStatus
+# 0.40 / 7.x
+# Add resolver for hosts
+# 2023/01/18
 
 :global lteInf lte1;
 :global lteStatus;
 :local lteInfOk [/interface find name=lte1];
 :local lteInetOk false;
 :local ltePing 0;
-#--yandex.ru, google.com, mail.ru
-:local pingHost {87.250.250.242; 64.233.164.101; 94.100.180.200};
+:local pingHost {"yandex.ru"; "google.com"; "mail.ru"};
+
+:global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
 
 :global Ping do={
     :local pingAddress $1;
@@ -28,8 +30,8 @@
 :if ( [:typeof $lteStatus] = "nothing" ) do={ :set lteStatus false; };
 :if ( $lteInfOk ) do={
     :foreach k in=$pingHost do={
-        :local res [$Ping $k count=1 interface=$lteInf]
-        :set ltePing ($ltePing + $res);
+            :local res [$Ping [$Resolve $k] count=1 interface=$lteInf]
+            :set ltePing ($ltePing + $res);
     }
     :set lteInetOk ($ltePing > 0);
     :put "lteInetOk=$lteInetOk";
