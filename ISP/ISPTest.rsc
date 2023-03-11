@@ -1,11 +1,12 @@
-# ISPTest
-# 0.40
-# Add manual and auto start
-# 2023/01/22
+## ISPTest
+## 0.41
+## Changed output of result: to the log if launches from the router
+## 2023/02/11
+## Run from router: [[:parse [/system script get ISPTest source]] run all noprint];
 
 :global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
 
-#---Function of sending message to telegram bot
+## Function of sending message to telegram bot
 :local SendMsg do={
     :local  nameID [ /system identity get name; ];
     :if ( [:len $1] != 0 ) do={ [[:parse [/system script get TG source]] Text=("/$nameID:"."%0A"."$1")]; };
@@ -14,7 +15,7 @@
 :local Help do={
     :local help ("ISPTest option: "."%0A". \
         " > print (only wan)"."%0A". \
-        " > run [interface name]");
+        " > run [interface name; all]");
     :return $help;
 }
 
@@ -39,13 +40,13 @@
     :local extInfList "WAN";
     :local pingInf [/interface list member find list=$extInfList];
     :local pingHost {"yandex.ru"; "google.com"; "youtube.com"; "mail.ru"};
-    # percent of good ping: ping > %%
+    ## percent of good ping: ping > %%
     :local pingCnt 10;
     :local failProc 50;
     :local infOk false;
     :local res ("ISPTest: " . "%0A");
     :local wanList;
-    #--One of WAN member is exist
+    ## One of WAN member is exist
     :if ( [:len $pingInf] = 0) do={ :return ("ISPTest: WAN interfaces not found!"); }
     :if ($runInf = "all") do={
         :local resAll;
@@ -67,24 +68,30 @@
                      }
                     :if ( $infOk ) do={ 
                         :if (!$printKey) do={ :set resAll ( "$resAll" . " > $tmpInf - OK!"."%0A"); }
-                    } else={ :set resAll ("$resAll" . " > $tmpInf - FAIL!"."%0A"); }
+                    } else={ 
+                        :if ($printKey) do={
+                            :set resAll ("$resAll" . " $tmpInf - FAIL!".";"); 
+                        } else={ :set resAll ("$resAll" . " > $tmpInf - FAIL!"."%0A"); };                   
+                    }
                 }
             }
         }
-        :if ( [:len $resAll] != 0 ) do={ :return ("ISPTest: " . "%0A" . "$resAll"); } else={ :return [] };
+        :if ( [:len $resAll] != 0 ) do={ 
+            :if ($printKey) do={:log warning ("ISPTest:" . "$resAll"); return [];} else={:return ("ISPTest: " . "%0A" . "$resAll");}
+        } else={ :return [] };
     }
-    #--Interface name is empty
+    ## Interface name is empty
     :if ($runInf = null) do={
         :return (" ISPTest:"."%0A"."  > interface cannot be empty, try again...");
     }
-    #--Interface is exisning
+    ## Interface is exisning
     :if ( [:len [/interface find name=$runInf] ] = 0 ) do={
         :return (" ISPTest:"."%0A"."  > interface \"$runInf\" not exist, try again...");
     }
-    #--Interface is WAN
+    ## Interface is WAN
     :foreach n in=$pingInf do={ :set wanList ("$wanList" . [/interface list member get $n interface]); }
     :if ( [:typeof [:find $wanList $runInf] ] != "num" ) do={ :return (" ISPTest:"."%0A"."  > interface \"$runInf\" not wan, use \"print\"..."); }
-    #--Interface is disabled
+    ## Interface is disabled
     :if [/interface get [find name=$runInf] disabled] do={
         :return (" ISPTest:"."%0A"."  > interface \"$runInf\" is disabled, try again...");
     }
@@ -101,7 +108,7 @@
     :if ( $infOk ) do={ :return ("$res"."---"."%0A"." $runInf - OK!"); } else={ :return ("$res"."---"."%0A"." $runInf - FAIL!");}
 }
 
-##--Main
+## Main
 :if ($0 = "print") do={ $SendMsg [$Print]; return []; } 
 :if ($0 = "run") do={ $SendMsg [$Run $1 $2]; return []; } 
 $SendMsg [$Help];
