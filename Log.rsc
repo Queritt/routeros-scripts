@@ -1,7 +1,7 @@
 ## Log
-## 0.12
-## 2023/03/11
-## Change of reset func
+## 0.13
+## 2023/03/12
+## Add find function
 
 :local SendMsg do={
     :local nameID [/system identity get name;];
@@ -10,7 +10,7 @@
 
 :local Help do={
     :local help ("Log option: "."%0A". \
-        " > print [all; head; tail]"."%0A". \
+        " > print [all; head; tail; find]"."%0A". \
         " > reset"."%0A". \
         " > set [1k-10k]")
     :return $help;
@@ -105,15 +105,27 @@
         :foreach n in=$startBuf do={
             :set topic [/log get $n topics];
             :set message [/log get $n message];
-            :if ($topic~"account" or $message~"script|log action changed") do={:put ""} else={:set tmpStartBuf ($tmpStartBuf, $n)}; 
+            :if ($topic~"account" or $message~"script|changed by") do={:put ""} else={:set tmpStartBuf ($tmpStartBuf, $n)}; 
         }
         :set startBuf $tmpStartBuf;
         :local start 0;
         :local end ([:len $startBuf] -1);
         ## Options
-        :if ([:typeof $option]="nothing" || $option~"all|head|tail") do={:put ""} else={$SendMsg (" Log: "."option \"$option\""." - not recognized, try again..."); return [];}; 
+        :if ([:typeof $option]="nothing" || $option~"all|head|tail|find") do={:put ""} else={$SendMsg (" Log: "."option \"$option\""." - not recognized, try again..."); return [];}; 
         ## Line Numbers
-        :if ([:typeof $lineNum]="nothing" || $lineNum~"[1-9]") do={:put ""} else={$SendMsg (" Log: "."\"$lineNum\""." - not allowed numbers, try again..."); return [];}; 
+        :if ([:typeof $lineNum]="nothing" || $option~"find" || $lineNum~"[1-9]") do={:put ""} else={$SendMsg (" Log: "."\"$lineNum\""." - not allowed numbers, try again..."); return [];}; 
+        ## FIND
+        :if ($option = "find") do={
+            :if ([:len $lineNum] < 3) do={$SendMsg (" Log: find requires at least 3 symbols."); return [];};
+            :set tmpStartBuf ({});
+            :foreach n in=$startBuf do={
+                :set message [/log get $n message];
+                :if ($message~$lineNum) do={:set tmpStartBuf ($tmpStartBuf, $n);}; 
+            }
+            :if ([:len $tmpStartBuf] = 0) do={$SendMsg (" Log: search \"$lineNum\" not found."); return [];};
+            :set startBuf $tmpStartBuf;
+            :set end ([:len $startBuf] -1);   
+        };
         ## NOTHING
         :if ([:typeof $option] = "nothing") do={:if ([:len $startBuf] >= 50) do={:set start ([:len $startBuf] - 50);}};
         ## HEAD
