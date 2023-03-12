@@ -1,7 +1,7 @@
 ## PPPFailover
-## 0.86 / 7.x
-## 2023/03/11
-## Added remove old tunnel func
+## 0.85 / 7.x
+## 2023/03/07
+## Added function to renew all interfece
 ## Changing server from file
 ## File in flash and contains name as "providerName" value
 
@@ -96,21 +96,6 @@
 }
 
 :local ChangeServer do={
-
-    :local RemoveOldTunnel do={
-        ## Value required: $1(address);
-        :local remAddress $1; :local srcAddress; :local dstAddress;
-        :do {
-            :foreach n in=[/ip firewall connection find] do={
-                :set srcAddress [/ip firewall connection get $n src-address];
-                :set dstAddress [/ip firewall connection get $n dst-address];
-                :if [:find $srcAddress ":"] do={:set srcAddress [:pick $srcAddress 0 [:find $srcAddress ":"]];};
-                :if [:find $dstAddress ":"] do={:set dstAddress [:pick $dstAddress 0 [:find $dstAddress ":"]];};
-                :if ($remAddress~"$srcAddress" or $remAddress~"$dstAddress") do={[/ip firewall connection remove $n];};
-            }
-        } on-error={:return []};
-    }
-    
     :local providerName $1;
     :local clientName $2;
     :local clientComment $3;
@@ -147,7 +132,6 @@
                 :set curAddress [/interface l2tp-client get $clientName connect-to];
                 :local tempComment ($clientComment . "-" . $providerName . "-" . $country . ", " . $city);
                 /interface l2tp-client set $clientName connect-to=$address comment=$tempComment;
-                $RemoveOldTunnel $curAddress;
                 :if ($clientComment = "main1") do={ 
                     :if ([:len $main1Renew] = 0) do={:set main1Renew ($main1Renew, $curAddress)};
                     :set main1Renew ($main1Renew, "$address"); 
@@ -173,7 +157,6 @@
                 :set curAddress [/interface l2tp-client get $clientName connect-to];
                 :local tempComment ($clientComment . "-" . $providerName . "-" . $country . ", " . $city);
                 /interface l2tp-client set $clientName connect-to=$address comment=$tempComment;
-                $RemoveOldTunnel $curAddress;
                 :if ($clientComment = "main1") do={ 
                     :if ([:len $main1Renew] = 0) do={:set main1Renew ($main1Renew, $curAddress)};
                     :set main1Renew ($main1Renew, "$address"); 
