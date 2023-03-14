@@ -1,7 +1,8 @@
 ## ISPFailover 
-## ver 0.92 / 7.x
+## ver 0.93 / 7.x
 ## Changed func Ping, HostPing
-## modified 2023/02/04
+## modified 2023/03/14
+## Disable connection or l2tp reset in SwitchToISP
 ## Run every 93s
 :global ispInf ether1;
 :global lteInf lte1;
@@ -32,28 +33,26 @@
 :local SwitchToISP do={
     :global lteId;
     /ip route set $lteId distance=4;
-    :foreach i in=[/ip firewall connection find protocol~"tcp"] do={ /ip firewall connection remove $i };
-    :foreach i in=[/ip firewall connection find protocol~"udp"] do={ /ip firewall connection remove $i };
+    # /ip firewall connection remove [find];
     /queue tree disable [find comment="LTE"];
     /queue tree enable [find comment="ISP-100"];
     /ip firewall raw disable [find comment="WEB-LTE"]; 
-    /interface disable l2tp-out1;
-    /interface disable l2tp-out2;
+    # /interface disable l2tp-out1;
+    # /interface disable l2tp-out2;
     ## /interface disable l2tp-out3;
-    :delay 2s;
-    /interface enable l2tp-out1;
-    /interface enable l2tp-out2;
+    # :delay 2s;
+    # /interface enable l2tp-out1;
+    # /interface enable l2tp-out2;
     ## /interface enable l2tp-out3;
     :delay 2s;
-    /log warning "ISP UP | Main internet activated";
+    /log warning "ISP UP";
 }
 
 :local SwitchToLTE do={
     :global lteId;
     :delay 1s; 
     /ip route set $lteId distance=1;
-    :foreach i in=[/ip firewall connection find protocol~"tcp"] do={ /ip firewall connection remove $i };
-    :foreach i in=[/ip firewall connection find protocol~"udp"] do={ /ip firewall connection remove $i };
+    /ip firewall connection remove [find];
     /queue tree disable [find comment="ISP-100"];
     /queue tree enable [find comment="LTE"];
     /ip firewall raw enable [find comment="WEB-LTE"]; 
@@ -65,7 +64,7 @@
     /interface enable [find name="l2tp-out2"];
     ## /interface enable [find name="l2tp-out3"];
     :delay 2s;
-    /log warning "ISP DOWN | Reserv internet activated";
+    /log warning "ISP DOWN";
 }
 
 ## BGP 
