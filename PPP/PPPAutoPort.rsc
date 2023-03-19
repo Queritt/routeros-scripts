@@ -1,7 +1,7 @@
 ## PPPAutoPort
 ## Open port where client logged more than <days>
-## 0.10
-## 2023/03/18
+## 0.11
+## 2023/03/19
 :local EpochTime do={
     :local ds $1;
     :local ts $2;
@@ -26,6 +26,7 @@
 
 :local clientName "Guest1";
 :local filterRule "allow pptp from anywhere";
+:local accessList "PPP-Access";
 :local activityPeriod 30;
 :if ([:len [/ppp secret find comment="$clientName"]] = 0) do={/log warning " PPPAutoPort: client \"$clientName\" not found."; :return []};
 :if ([:len [/ip firewall filter find comment="$filterRule"]] = 0) do={
@@ -48,6 +49,12 @@
     :if [/ip firewall filter find comment="$filterRule" disabled=no] do={
         [/ip firewall filter disable [find comment="$filterRule"]];
         :local lastClientIp [/ppp secret get [find comment="$clientName"] last-caller-id];
+        :if ([:len [/ip firewall address-list find comment="$clientName"]] = 0) do={
+            /ip firewall address-list add address=$lastClientIp comment="$clientName" list=$accessList;
+        } else={
+            :local curClientIp [/ip firewall address-list get [find comment=$clientName] address];
+            :if ($curClientIp != $lastClientIp) do={/ip firewall address-list set [find comment=$clientName] address=$lastClientIp};
+        };
         /log warning " PPPAutoPort: client \"$clientName\" from $lastClientIp connected in $activityPeriod days, filter rule disabled.";
     }  
 }
