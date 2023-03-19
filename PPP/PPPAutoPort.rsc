@@ -1,6 +1,6 @@
 ## PPPAutoPort
 ## Open port where client logged more than <days>
-## 0.11
+## 0.12
 ## 2023/03/19
 :local EpochTime do={
     :local ds $1;
@@ -28,9 +28,9 @@
 :local filterRule "allow pptp from anywhere";
 :local accessList "PPP-Access";
 :local activityPeriod 30;
-:if ([:len [/ppp secret find comment="$clientName"]] = 0) do={/log warning " PPPAutoPort: client \"$clientName\" not found."; :return []};
+:if ([:len [/ppp secret find comment="$clientName"]] = 0) do={/log warning "PPPAutoPort: \"$clientName\" not found."; :return []};
 :if ([:len [/ip firewall filter find comment="$filterRule"]] = 0) do={
-    /log warning " PPPAutoPort: filter rule \"$clientName\" not found."; :return []}; 
+    /log warning " PPPAutoPort: filter \"$filterRule\" not found."; :return []}; 
 :local curDate [/system clock get date];
 :local curTime [/system clock get time];
 :local clientDateTime [/ppp secret get [find comment="$clientName"] last-logged-out];
@@ -42,19 +42,22 @@
 
 :if ($difActive > $activityPeriod or $difActive < 0) do={
     :if [/ip firewall filter find comment="$filterRule" disabled=yes] do={
-        [/ip firewall filter enable [find comment="$filterRule"]];
-        /log warning " PPPAutoPort: client \"$clientName\" not connected in $activityPeriod days, filter rule enabled.";
+        /ip firewall filter enable [find comment="$filterRule"];
+        /log warning "PPPAutoPort: \"$clientName\" not connected in $activityPeriod days, access enabled.";
     }    
 } else={
     :if [/ip firewall filter find comment="$filterRule" disabled=no] do={
-        [/ip firewall filter disable [find comment="$filterRule"]];
-        :local lastClientIp [/ppp secret get [find comment="$clientName"] last-caller-id];
+        :local lastClientAddress [/ppp secret get [find comment="$clientName"] last-caller-id];
         :if ([:len [/ip firewall address-list find comment="$clientName"]] = 0) do={
-            /ip firewall address-list add address=$lastClientIp comment="$clientName" list=$accessList;
+            /ip firewall address-list add address=$lastClientAddress comment="$clientName" list=$accessList;
         } else={
-            :local curClientIp [/ip firewall address-list get [find comment=$clientName] address];
-            :if ($curClientIp != $lastClientIp) do={/ip firewall address-list set [find comment=$clientName] address=$lastClientIp};
+            :local curClientAddress [/ip firewall address-list get [find comment=$clientName] address];
+            :if ($curClientAddress != $lastClientAddress) do={
+                /ip firewall address-list set [find comment=$clientName] address=$lastClientAddress;
+                /log warning "PPPAutoPort: \"$clientName\" updated $curClientAddress to $lastClientAddress.";
+            };
         };
-        /log warning " PPPAutoPort: client \"$clientName\" from $lastClientIp connected in $activityPeriod days, filter rule disabled.";
+        /ip firewall filter disable [find comment="$filterRule"];
+        /log warning "PPPAutoPort: \"$clientName\" from $lastClientAddress connected in $activityPeriod days, access disabled.";
     }  
 }
