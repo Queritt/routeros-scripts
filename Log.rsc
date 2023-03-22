@@ -1,7 +1,7 @@
 ## Log
-## 0.13
-## 2023/03/12
-## Add find function
+## 0.14
+## 2023/03/21
+## Add time function
 
 :local SendMsg do={
     :local nameID [/system identity get name;];
@@ -10,7 +10,7 @@
 
 :local Help do={
     :local help ("Log option: "."%0A". \
-        " > print [all; head; tail; find]"."%0A". \
+        " > print [all; head; tail; find; time]"."%0A". \
         " > reset"."%0A". \
         " > set [1k-10k]")
     :return $help;
@@ -92,6 +92,46 @@
         }
         :return ($convStr);
     }
+
+    # --function convert string to lowstring by Osama, modified Sertik--
+    :local fsLowStr do={
+        :local fsLowerChar do={
+            :local "fs_lower" "0123456789abcdefghijklmnopqrstuvwxyz";
+            :local "fs_upper" "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            :local pos [:find $"fs_upper" $1]
+                :if ($pos > -1) do={:return [:pick $"fs_lower" $pos];}
+                :return $1}
+    :local result ""; :local in $1
+        :for i from=0 to=([:len $in] - 1) do={
+            :set result ($result . [$fsLowerChar [:pick $in $i]])}
+            :return $result;
+    }
+
+    :local EpochTime do={
+        :local ds $1;
+        :local ts $2;
+        :local curDate [/system clock get date];
+        :local curYear [:pick $curDate 8 ([:len $curDate]-1)];
+        :if ([:len $1]>19) do={:set ds "$[:pick $1 0 11]"; :set ts [:pick $1 12 20]};
+        :if ([:len $1]>8 && [:len $1]<20) do={:set ds "$[:pick $1 0 6]/$curYear"; :set ts [:pick $1 7 15]};
+        :local yesterday false;
+        :if ([:len $1]=8) do={
+            :if ([:totime $1]>ts) do={:set yesterday (true)};
+            :set ds $curDate;
+            :set ts $1;
+        }
+        :local months;
+        :if ((([:pick $ds 9 11]-1)/4)!=(([:pick $ds 9 11])/4)) do={
+            :set months {"an"=0;"eb"=31;"ar"=60;"pr"=91;"ay"=121;"un"=152;"ul"=182;"ug"=213;"ep"=244;"ct"=274;"ov"=305;"ec"=335};
+        } else={
+            :set months {"an"=0;"eb"=31;"ar"=59;"pr"=90;"ay"=120;"un"=151;"ul"=181;"ug"=212;"ep"=243;"ct"=273;"ov"=304;"ec"=334};
+        }
+        :set ds (([:pick $ds 9 11]*365)+(([:pick $ds 9 11]-1)/4)+($months->[:pick $ds 1 3])+[:pick $ds 4 6]);
+        :set ts (([:pick $ts 0 2]*3600)+([:pick $ts 3 5]*60)+[:pick $ts 6 8]);
+        :if (yesterday) do={:set ds ($ds-1)};
+        :return ($ds*86400+$ts+946684800-[/system clock get gmt-offset]);
+    }  
+
     :do {
         :local option $1;
         :local lineNum $2;
@@ -108,18 +148,20 @@
             :if ($topic~"account" or $message~"script|changed by") do={:put ""} else={:set tmpStartBuf ($tmpStartBuf, $n)}; 
         }
         :set startBuf $tmpStartBuf;
+        :if ([:len $startBuf]=0) do={$SendMsg (" Log: items not found."); return [];};
         :local start 0;
         :local end ([:len $startBuf] -1);
         ## Options
-        :if ([:typeof $option]="nothing" || $option~"all|head|tail|find") do={:put ""} else={$SendMsg (" Log: "."option \"$option\""." - not recognized, try again..."); return [];}; 
+        :if ([:typeof $option]="nothing" || $option~"all|head|tail|find|time") do={:put ""} else={$SendMsg (" Log: "."option \"$option\""." - not recognized, try again..."); return [];}; 
         ## Line Numbers
-        :if ([:typeof $lineNum]="nothing" || $option~"find" || $lineNum~"[1-9]") do={:put ""} else={$SendMsg (" Log: "."\"$lineNum\""." - not allowed numbers, try again..."); return [];}; 
+        :if ([:typeof $lineNum]="nothing" || $option~"find" || $option~"time" || $lineNum~"[1-9]") do={:put ""} else={$SendMsg (" Log: "."\"$lineNum\""." - not allowed numbers, try again..."); return [];}; 
         ## FIND
         :if ($option = "find") do={
             :if ([:len $lineNum] < 3) do={$SendMsg (" Log: find requires at least 3 symbols."); return [];};
             :set tmpStartBuf ({});
+            :set lineNum [$fsLowStr $lineNum];
             :foreach n in=$startBuf do={
-                :set message [/log get $n message];
+                :set message [$fsLowStr [/log get $n message]];
                 :if ($message~$lineNum) do={:set tmpStartBuf ($tmpStartBuf, $n);}; 
             }
             :if ([:len $tmpStartBuf] = 0) do={$SendMsg (" Log: search \"$lineNum\" not found."); return [];};
@@ -138,6 +180,30 @@
             :if ([:typeof $lineNum] = "nothing") do={:if ([:len $startBuf] >= 20) do={:set start ([:len $startBuf] - 20);}};
             :if ($lineNum~"[1-9]") do={:if ($lineNum < [:len $startBuf]) do={:set start ([:len $startBuf] - $lineNum)};};
         };
+        ## TIME
+        :if ($option = "time") do={
+            :if ([:typeof $lineNum]="nothing") do={:set $lineNum 1};
+            :if (([:len $lineNum] > 0) && $lineNum~"[1-9]") do={:put ""} else={$SendMsg (" Log: time requires only numbers, try again..."); return [];}; 
+            :local curDate [/system clock get date];
+            :local curTime [/system clock get time];
+            :local curEpochTime [$EpochTime ($curDate." ".$curTime)];
+            :local printEpochTime ($curEpochTime - ($lineNum*3600));
+            :local lenStartBuf [:len $startBuf];
+            :local firstLineEpochTime [$EpochTime [/log get [:pick $startBuf 0] time]];
+            :local lastLineEpochTime [$EpochTime [/log get [:pick $startBuf ($lenStartBuf -1)] time]];
+            :local outOfLog false;
+            :if ($printEpochTime < $firstLineEpochTime) do={:set outOfLog true};
+            :if ($lastLineEpochTime < $printEpochTime) do={$SendMsg (" Log: items in $lineNum"."hr not found."); return [];};
+            :if (!$outOfLog) do={
+                :local count 0;
+                :set start -1;
+                :while ($start < 0 && ($count < $lenStartBuf)) do={
+                    :set time [$EpochTime [/log get [:pick $startBuf $count] time]];
+                    :if ($time >= $printEpochTime) do={:set start $count};
+                    :set count ($count+1);
+                }
+            }
+        }
         :for n from=$start to=$end do={
             :set message [$FindMacAddr [/log get [:pick $startBuf $n] message]];
             :set time [/log get [:pick $startBuf $n] time];
