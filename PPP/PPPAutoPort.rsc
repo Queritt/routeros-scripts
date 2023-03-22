@@ -1,15 +1,20 @@
 ## PPPAutoPort
 ## Open port where client logged more than <days>
-## 0.12
-## 2023/03/19
+## 0.13
+## 2023/03/22
+## Fix EpochTime
 :local EpochTime do={
+    ## 0.10 ## 2023/03/21
     :local ds $1;
     :local ts $2;
+    :local curDate [/system clock get date];
+    :local curYear [:pick $curDate 8 ([:len $curDate]-1)];
     :if ([:len $1]>19) do={:set ds "$[:pick $1 0 11]"; :set ts [:pick $1 12 20]};
-    :if ([:len $1]>8 && [:len $1]<20) do={:set ds "$[:pick $1 0 6]/$[:pick $ds 7 11]"; :set ts [:pick $1 7 15]};
+    :if ([:len $1]>8 && [:len $1]<20) do={:set ds "$[:pick $1 0 6]/$curYear"; :set ts [:pick $1 7 15]};
     :local yesterday false;
     :if ([:len $1]=8) do={
         :if ([:totime $1]>ts) do={:set yesterday (true)};
+        :set ds $curDate;
         :set ts $1;
     }
     :local months;
@@ -36,8 +41,8 @@
 :local clientDateTime [/ppp secret get [find comment="$clientName"] last-logged-out];
 :local clientDate [:pick $clientDateTime 0 11];
 :local clientTime [:pick $clientDateTime 12 20];
-:local curEpochTime [$EpochTime $curDate $curTime];
-:local clientEpochTime [$EpochTime $clientDate $clientTime];
+:local curEpochTime [$EpochTime ($curDate." ".$curTime)];
+:local clientEpochTime [$EpochTime ($clientDate." ".$clientTime)];
 :local difActive (($curEpochTime - $clientEpochTime) / 3600 / 24);
 
 :if ($difActive > $activityPeriod or $difActive < 0) do={
