@@ -1,7 +1,7 @@
 ## ISPTest
-## 0.42
-## Minor code change
-## 2023/02/26
+## 0.43
+## 2023/03/23
+## Add exception list
 ## Run from router: [[:parse [/system script get ISPTest source]] run all noprint];
 
 :global Resolve do={ :do {:if ([:typeof [:tonum $1]] != "num") do={:return [:resolve $1];}; :return $1;} on-error={:return 0.0.0.1;}; }
@@ -40,6 +40,8 @@
     :local extInfList "WAN";
     :local pingInf [/interface list member find list=$extInfList];
     :local pingHost {"yandex.ru"; "google.com"; "youtube.com"; "mail.ru"};
+    :local exceptionList {"ovpn-out1"};
+    :local exceptionFound false;
     ## percent of good ping: ping > %%
     :local pingCnt 10;
     :local failProc 50;
@@ -47,11 +49,17 @@
     :local res ("ISPTest: " . "%0A");
     :local wanList;
     ## One of WAN member is exist
-    :if ( [:len $pingInf] = 0) do={ :return ("ISPTest: WAN interfaces not found!"); }
+    :if ( [:len $pingInf] = 0) do={:return ("ISPTest: WAN interfaces not found!");};
+    :local tmpPingInf ({});
+    :foreach n in=$pingInf do={
+        :if ([:len [:find $exceptionList [/interface list member get $n interface]]] = 0) do={:set tmpPingInf ($tmpPingInf, $n)}
+    }
+    :set pingInf $tmpPingInf;
     :if ($runInf = "all") do={
         :local resAll;
+        :local tmpInf;
         :foreach n in=$pingInf do={ 
-            :local tmpInf [/interface list member get $n interface];
+            :set tmpInf [/interface list member get $n interface];
             :if ( [:typeof [:find $tmpInf "*"]] = "nil" ) do={
                 :if ( ![/interface get [find name=$tmpInf] disabled] ) do={
                     :set infOk false;
