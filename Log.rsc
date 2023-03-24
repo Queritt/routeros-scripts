@@ -1,7 +1,7 @@
 ## Log
-## 0.14
-## 2023/03/21
-## Add time function
+## 0.15
+## 2023/03/24
+## Add stop words to find
 
 :local SendMsg do={
     :local nameID [/system identity get name;];
@@ -145,7 +145,7 @@
         :foreach n in=$startBuf do={
             :set topic [/log get $n topics];
             :set message [/log get $n message];
-            :if ($topic~"account" or $message~"script|changed by") do={:put ""} else={:set tmpStartBuf ($tmpStartBuf, $n)}; 
+            :if ($topic~"account" or $message~"script|changed by|added by|removed by") do={:put ""} else={:set tmpStartBuf ($tmpStartBuf, $n)}; 
         }
         :set startBuf $tmpStartBuf;
         :if ([:len $startBuf]=0) do={$SendMsg (" Log: items not found."); return [];};
