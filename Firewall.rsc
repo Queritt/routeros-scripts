@@ -1,7 +1,7 @@
 ## Firewall
 ## 0.61
-## 2023/03/23
-## Add ip checking; minor code optimize
+## 2023/03/24
+## Minor code optimize
 
 :local SendMsg do={
     :local  nameID [ /system identity get name; ];
@@ -32,10 +32,9 @@
     }
     :if ( $action = "add" ) do={
         :do {
-            :if ([:typeof [:toip $address]] != "ip") do={:return (" Firewall $action error: \"$address\" wrong or empty.");};
             [:parse ("ip firewall address-list $action address=$address list=WEB-2 timeout=01:00:00 comment=\"Firewall-script\"")];
             :return (" Firewall: " . "\"$address\"" . " successfully " . "$action" . "ed to list \"WEB-2\".");
-        } on-error={ :return " Firewall $action error: \"$address\" already exists! Try again..."; }   
+        } on-error={ :return "Address-list $action error: \"$address\" is wrong or already exists! Try again..."; }   
     }
     :if ( $action = "enable" || $action = "disable" ) do={
         :do {
