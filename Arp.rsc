@@ -51,7 +51,7 @@
         :set arpMac [/ip arp get $n mac-address];
         :set arpInf [/ip arp get $n interface];
         :set arpComment [/ip arp get $n comment];
-        :if (($findAddress = $arpAddress || $findAddress = $arpMac) and $arpComment != "") do={
+        :if (($findAddress = $arpAddress || $findAddress = $arpMac) and $arpComment = "") do={
             /ip arp remove $n;
             :return (" Arp: \"$findAddress $arpMac $arpInf\" removed.")
         }
