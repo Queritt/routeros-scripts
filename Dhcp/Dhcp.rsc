@@ -1,15 +1,17 @@
 ## Dhcp
-## 0.10
-## 2023/03/29
+## 0.11
+## added server print
+## 2023/03/30
 
 :local SendMsg do={
-    :local  nameID [ /system identity get name; ];
-    :if ( [:len $1] != 0 ) do={ [[:parse [/system script get TG source]] Text=("/$nameID:"."%0A"."$1")]; };
+    :local  nameID [/system identity get name;];
+    :if ([:len $1] != 0) do={[[:parse [/system script get TG source]] Text=("/$nameID:"."%0A"."$1")];};
 }
 
 :local Help do={
     :local help (" Dhcp option: "."%0A". \
-    "  > print [all, bound, waiting, dynamic, ip, mac, comment]"."%0A". \
+    "  > print [all, bound, waiting, dynamic,"."%0A". \
+    "   static, ip, mac, server, comment]"."%0A". \
     "  > remove [dynamic, ip, mac, comment]");
     :return $help;
 }
@@ -73,11 +75,11 @@
         :set dhcpStatus  [/ip dhcp-server lease get $n status];
         :set dhcpComment [/ip dhcp-server lease get $n comment];
         :set dhcpDynamic [/ip dhcp-server lease get $n dynamic];
-        :if ([:len $dhcpServer] = 0) do={:set dhcpServer "all"};
+        :if ([:len $dhcpServer] = 0) do={:set dhcpServer "any"};
         :if ($findAddress="all") do={
             :set outMsg ("$outMsg"." > $dhcpServer ".": $dhcpAddress "."$dhcpMac "."\n  "."$dhcpStatus "."$dhcpComment "."$dhcpHost "."$dhcpExpires"."\n");
         }
-        :if (([:len $findAddress] > 2) and ([:find ("$dhcpAddress $dhcpMac $dhcpHost $dhcpComment") $findAddress] > -1)) do={
+        :if (([:len $findAddress] > 2) and ([:find ("$dhcpAddress $dhcpMac $dhcpServer $dhcpHost $dhcpComment") $findAddress] > -1)) do={
             :set outMsg ("$outMsg"." > $dhcpServer ".": $dhcpAddress "."$dhcpMac "."\n  "."$dhcpStatus "."$dhcpComment "."$dhcpHost "."$dhcpExpires"."\n");
         }
         :if (($findAddress = "bound" and $dhcpStatus = "bound") or ($findAddress = "waiting" and $dhcpStatus = "waiting")) do={
@@ -110,12 +112,12 @@
         :set dhcpComment [/ip dhcp-server lease get $n comment];
         :set dhcpDynamic [/ip dhcp-server lease get $n dynamic];
         :if (($findAddress = $dhcpAddress or $findAddress = $dhcpMac or $findAddress = $dhcpHost or $findAddress = $dhcpComment) and $dhcpDynamic) do={
-            [/ip dhcp-server lease remove $n];
+            /ip dhcp-server lease remove $n;
             :return (" Dhcp: \"$dhcpServer $dhcpAddress $dhcpMac $dhcpComment $dhcpHost\" removed.")
         }
         :if ($findAddress = "dynamic" and $dhcpDynamic) do={
-            :set dhcpDynamicRemove ($dhcpDynamicRemove, (" > $dhcpServer $dhcpAddress $dhcpMac"."\n "."$dhcpComment $dhcpHost"."\n"))
-            [/ip dhcp-server lease remove $n];
+            :set dhcpDynamicRemove ("$dhcpDynamicRemove"." > $dhcpServer $dhcpAddress $dhcpMac"."\n "."$dhcpComment $dhcpHost"."\n");
+            /ip dhcp-server lease remove $n;
         }
     }
     :if ([:len $dhcpDynamicRemove] > 0) do={
