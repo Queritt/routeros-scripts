@@ -1,11 +1,27 @@
 ## Dhcp
-## 0.11
-## added server print
+## 0.12
+## add split message func
 ## 2023/03/30
 
 :local SendMsg do={
-    :local  nameID [/system identity get name;];
-    :if ([:len $1] != 0) do={[[:parse [/system script get TG source]] Text=("/$nameID:"."%0A"."$1")];};
+    :if ([:len $1] != 0) do={
+        :local nameID [/system identity get name;];
+        :local outMsg $1;
+        :local outMsgSplit;
+        :local cnt 1;
+        :local logPart ([:len ("/$nameID:"."%0A"."$outMsg")] / 4096 + 1);
+        :if ([:len ("/$nameID:"."%0A"."$outMsg")] > 4096) do={
+            :while ([:len $outMsg] > 0) do={
+                :set outMsg ("/$nameID "."(message $cnt of $logPart):"."%0A"."$outMsg");
+                :if ([:len $outMsg] > 4096) do={
+                    :set outMsgSplit ($outMsgSplit, [:pick $outMsg 0 4096]);
+                    :set $outMsg [:pick $outMsg 4096 [:len $outMsg]];
+                } else={:set outMsgSplit ($outMsgSplit, $outMsg); :set $outMsg "";};
+                :set cnt ($cnt +1);
+            }
+        } else={:set outMsgSplit ("/$nameID:"."%0A"."$outMsg")};
+        :foreach n in=$outMsgSplit do={[[:parse [/system script get TG source]] Text=($n)];};
+    }
 }
 
 :local Help do={
@@ -77,16 +93,16 @@
         :set dhcpDynamic [/ip dhcp-server lease get $n dynamic];
         :if ([:len $dhcpServer] = 0) do={:set dhcpServer "any"};
         :if ($findAddress="all") do={
-            :set outMsg ("$outMsg"." > $dhcpServer ".": $dhcpAddress "."$dhcpMac "."\n  "."$dhcpStatus "."$dhcpComment "."$dhcpHost "."$dhcpExpires"."\n");
+            :set outMsg ("$outMsg > $dhcpServer: $dhcpAddress $dhcpMac $dhcpStatus $dhcpComment $dhcpHost $dhcpExpires \n");
         }
         :if (([:len $findAddress] > 2) and ([:find ("$dhcpAddress $dhcpMac $dhcpServer $dhcpHost $dhcpComment") $findAddress] > -1)) do={
-            :set outMsg ("$outMsg"." > $dhcpServer ".": $dhcpAddress "."$dhcpMac "."\n  "."$dhcpStatus "."$dhcpComment "."$dhcpHost "."$dhcpExpires"."\n");
+            :set outMsg ("$outMsg > $dhcpServer: $dhcpAddress $dhcpMac $dhcpStatus $dhcpComment $dhcpHost $dhcpExpires \n");
         }
         :if (($findAddress = "bound" and $dhcpStatus = "bound") or ($findAddress = "waiting" and $dhcpStatus = "waiting")) do={
-            :set outMsg ("$outMsg"." > $dhcpServer ".": $dhcpAddress "."$dhcpMac "."\n  "."$dhcpStatus "."$dhcpComment "."$dhcpHost "."$dhcpExpires"."\n");
+            :set outMsg ("$outMsg > $dhcpServer: $dhcpAddress $dhcpMac $dhcpStatus $dhcpComment $dhcpHost $dhcpExpires \n");
         }
         :if (($findAddress = "dynamic" and $dhcpDynamic) or ($findAddress = "static" and (!$dhcpDynamic))) do={
-            :set outMsg ("$outMsg"." > $dhcpServer ".": $dhcpAddress "."$dhcpMac "."\n  "."$dhcpStatus "."$dhcpComment "."$dhcpHost "."$dhcpExpires"."\n");   
+            :set outMsg ("$outMsg > $dhcpServer: $dhcpAddress $dhcpMac $dhcpStatus $dhcpComment $dhcpHost $dhcpExpires \n");
         }
     };
     :if ([:len $outMsg] > 0) do={
@@ -116,7 +132,7 @@
             :return (" Dhcp: \"$dhcpServer $dhcpAddress $dhcpMac $dhcpComment $dhcpHost\" removed.")
         }
         :if ($findAddress = "dynamic" and $dhcpDynamic) do={
-            :set dhcpDynamicRemove ("$dhcpDynamicRemove"." > $dhcpServer $dhcpAddress $dhcpMac"."\n "."$dhcpComment $dhcpHost"."\n");
+            :set dhcpDynamicRemove ("$dhcpDynamicRemove"." > $dhcpServer $dhcpAddress $dhcpMac $dhcpComment $dhcpHost"."\n");
             /ip dhcp-server lease remove $n;
         }
     }
