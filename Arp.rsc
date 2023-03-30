@@ -1,11 +1,27 @@
 ## Arp
-## 0.11
-## added func to remove and print dynamic items
+## 0.12
+## add split message func
 ## 2023/03/30
 
 :local SendMsg do={
-    :local nameID [/system identity get name;];
-    :if ([:len $1] != 0) do={ [[:parse [/system script get TG source]] Text=("/$nameID:"."%0A"."$1")]; };
+    :if ([:len $1] != 0) do={
+        :local nameID [/system identity get name;];
+        :local outMsg $1;
+        :local outMsgSplit;
+        :local cnt 1;
+        :local logPart ([:len ("/$nameID:"."%0A"."$outMsg")] / 4096 + 1);
+        :if ([:len ("/$nameID:"."%0A"."$outMsg")] > 4096) do={
+            :while ([:len $outMsg] > 0) do={
+                :set outMsg ("/$nameID "."(message $cnt of $logPart):"."%0A"."$outMsg");
+                :if ([:len $outMsg] > 4096) do={
+                    :set outMsgSplit ($outMsgSplit, [:pick $outMsg 0 4096]);
+                    :set $outMsg [:pick $outMsg 4096 [:len $outMsg]];
+                } else={:set outMsgSplit ($outMsgSplit, $outMsg); :set $outMsg "";};
+                :set cnt ($cnt +1);
+            }
+        } else={:set outMsgSplit ("/$nameID:"."%0A"."$outMsg")};
+        :foreach n in=$outMsgSplit do={[[:parse [/system script get TG source]] Text=($n)];};
+    }
 }
 
 :local Help do={
@@ -70,13 +86,13 @@
         :set arpComment [/ip arp get $n comment];
         :set arpDynamic [/ip arp get $n dynamic];
         :if ($findAddress="all") do={
-            :set outMsg ("$outMsg"." > $arpInf".": $arpAddress "."$arpMac "."$arpComment"."\n");
+            :set outMsg ("$outMsg > $arpInf: $arpAddress $arpMac $arpComment \n");
         }
         :if (([:len $findAddress] >= 3) and ([:find ("$arpAddress $arpMac $arpInf $arpComment") $findAddress] > -1)) do={
-            :set outMsg ("$outMsg"." > $arpInf".": $arpAddress "."$arpMac "."$arpComment"."\n");
+            :set outMsg ("$outMsg > $arpInf: $arpAddress $arpMac $arpComment \n");
         }
         :if (($findAddress = "dynamic" and $arpDynamic) or ($findAddress = "static" and (!$arpDynamic))) do={
-            :set outMsg ("$outMsg"." > $arpInf".": $arpAddress "."$arpMac "."$arpComment"."\n");  
+            :set outMsg ("$outMsg > $arpInf: $arpAddress $arpMac $arpComment \n"); 
         }
     };
     :if ([:len $outMsg] > 0) do={
@@ -90,26 +106,24 @@
     :local arpAddress;
     :local arpMac; 
     :local arpInf;
-    :local arpComment;
     :local arpDynamic; 
     :local arpDynamicRemove; 
     :foreach n in=$startBuf do={
         :set arpAddress [/ip arp get $n address];
         :set arpMac     [/ip arp get $n mac-address];
         :set arpInf     [/ip arp get $n interface];
-        :set arpComment [/ip arp get $n comment];
         :set arpDynamic [/ip arp get $n dynamic];
         :if (($findAddress = $arpAddress or $findAddress = $arpMac) and $arpDynamic) do={
             /ip arp remove $n;
             :return (" Arp: \"$arpAddress $arpMac $arpInf\" removed.")
         }
         :if ($findAddress = "dynamic" and $arpDynamic) do={
-            :set arpDynamicRemove ("$arpDynamicRemove"." > $arpAddress $arpMac $arpInf"."\n");
+            :set arpDynamicRemove ("$arpDynamicRemove > $arpAddress $arpMac $arpInf \n");
             /ip arp remove $n;
         }
     }
     :if ([:len $arpDynamicRemove] > 0) do={
-        :return (" Arp dynamic removed:"."\n"."$arpDynamicRemove");
+        :return (" Arp dynamic removed: \n $arpDynamicRemove");
     }
     :return (" Arp remove error: \"$findAddress\" empty or not found or has a comment.")
 }
