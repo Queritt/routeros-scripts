@@ -1,7 +1,7 @@
 ## Dhcp
-## 0.12
+## 0.13b
 ## add split message func
-## 2023/03/30
+## 2023/03/31
 
 :local SendMsg do={
     :if ([:len $1] != 0) do={
@@ -9,11 +9,17 @@
         :local outMsg $1;
         :local outMsgSplit;
         :local cnt 1;
+        :local tmpStr;
         :local logPart ([:len ("/$nameID:"."%0A"."$outMsg")] / 4096 + 1);
         :if ([:len ("/$nameID:"."%0A"."$outMsg")] > 4096) do={
             :while ([:len $outMsg] > 0) do={
                 :set outMsg ("/$nameID "."(message $cnt of $logPart):"."%0A"."$outMsg");
                 :if ([:len $outMsg] > 4096) do={
+                    :set tmpStr [:pick $outMsg 0 4096];
+                    :if ([:pick $outMsg ([:len $tmpStr] -1)] = "%" or [:pick $outMsg ([:len $tmpStr] -2)] = "%") do={
+                        :set outMsgSplit ($outMsgSplit, [:pick $outMsg 0 4094]);
+                        :set $outMsg [:pick $outMsg 4094 [:len $outMsg]];
+                    }
                     :set outMsgSplit ($outMsgSplit, [:pick $outMsg 0 4096]);
                     :set $outMsg [:pick $outMsg 4096 [:len $outMsg]];
                 } else={:set outMsgSplit ($outMsgSplit, $outMsg); :set $outMsg "";};
