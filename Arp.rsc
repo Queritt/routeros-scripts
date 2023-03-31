@@ -1,6 +1,6 @@
 ## Arp
 ## 0.14
-## add split message by line
+## add split message by string
 ## 2023/03/31
 
 :local SendMsg do={
@@ -31,10 +31,8 @@
             }
         } else={:set outMsgSplit {$outMsg}};
         :set logPart [:len $outMsgSplit];
-        :for n from=0 to=([:len $outMsgSplit] -1) do={
-            [[:parse [/system script get TG source]] \
-            Text=("/$nameID "."(message ".($n+1)." of $logPart):"."%0A".[:pick $outMsgSplit $n])];
-        }
+        :for n from=0 to=([:len $outMsgSplit] -1) do={[[:parse [/system script get TG source]] \
+            Text=("/$nameID "."(message ".($n+1)." of $logPart):"."%0A".[:pick $outMsgSplit $n])];};
     }
 }
 
