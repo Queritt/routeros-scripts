@@ -16,7 +16,7 @@
             :while ([:len $outMsg] > 0) do={
                 :if ([:len $outMsg] > $maxLength) do={
                     :set foundChar -1;
-                    :for n from=0 to=([:len $outMsg] -3) do={
+                    :for n from=0 to=($maxLength -3) do={
                         :set tmpChar [:pick $outMsg $n ($n +3)];
                         :if ($tmpChar = "%0A" and (($n +2) < $maxLength)) do={:set foundChar $n; :set n ($n +3);};
                     }
