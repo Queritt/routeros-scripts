@@ -32,7 +32,7 @@
         } else={:set outMsgSplit {$outMsg}};
         :set logPart [:len $outMsgSplit];
         :for n from=0 to=([:len $outMsgSplit] -1) do={[[:parse [/system script get TG source]] \
-            Text=("/$nameID "."(message ".($n+1)." of $logPart):"."%0A".[:pick $outMsgSplit $n])];};
+            Text=("/$nameID "."(message ".($n+1)." of $logPart):"."%0A".[:pick $outMsgSplit $n])]; delay 2s;};
     }
 }
 
