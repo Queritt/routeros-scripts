@@ -1,11 +1,43 @@
 ## Log
-## 0.15
-## 2023/03/24
-## Add stop words to find
+## 0.17
+## 2023/04/02
+## Increase code speed
 
 :local SendMsg do={
-    :local nameID [/system identity get name;];
-    :if ([:len $1] != 0) do={ [[:parse [/system script get TG source]] Text=("/$nameID:"."%0A"."$1")]; };
+    :if ([:len $1] != 0) do={
+        :local nameID [/system identity get name;];
+        :local outMsg $1;
+        :local outMsgSplit;
+        :local logPart
+        :local tmpChar;
+        :local maxLength (4096 - [:len ("/$nameID ")] - [:len ("(message 99 of 99):"."%0A")]);
+        :local foundChar;
+        :local counter;
+        :if ([:len ("/$nameID:"."%0A"."$outMsg")] > 4096) do={
+            :while ([:len $outMsg] > 0) do={
+                :if ([:len $outMsg] > $maxLength) do={
+                    :set foundChar -1;
+                    :set counter ($maxLength -3);
+                    :while ($foundChar = -1 and $counter > -1) do={
+                        :set tmpChar [:pick $outMsg $counter ($counter +3)];
+                        :if ($tmpChar = "%0A") do={:set foundChar $counter;};
+                        :set counter ($counter -1);
+                    }
+                    :if ($foundChar > -1) do={
+                        :set outMsgSplit ($outMsgSplit, [:pick $outMsg 0 ($foundChar +3)]);
+                        :set $outMsg [:pick $outMsg ($foundChar +3) [:len $outMsg]];
+                    } else={
+                        :set outMsgSplit ($outMsgSplit, [:pick $outMsg 0 $maxLength]);
+                        :set $outMsg [:pick $outMsg $maxLength [:len $outMsg]];
+                    }
+                } else={:set outMsgSplit ($outMsgSplit, $outMsg); :set $outMsg "";};
+            }
+        } else={:set outMsgSplit {$outMsg}};
+        :set logPart [:len $outMsgSplit];
+        :for n from=0 to=([:len $outMsgSplit] -1) do={
+            [[:parse [/system script get TG source]] \
+            Text=("/$nameID "."(message ".($n+1)." of $logPart):"."%0A".[:pick $outMsgSplit $n])]; delay 2s;};
+    }
 }
 
 :local Help do={
@@ -33,11 +65,6 @@
 }
 
 :local PrintLog do={
-
-    :local SendMsg do={
-        :local  nameID [ /system identity get name; ];
-        :if ( [:len $1] != 0 ) do={ [[:parse [/system script get TG source]] Text=("/$nameID:"."%0A"."$1")]; };
-    }
 
     # Function of searching comments for MAC-address
     # https://forummikrotik.ru/viewtopic.php?p=73994#p73994
@@ -138,7 +165,7 @@
         :local message;
         :local time;
         :local topic;
-        :local outMsg;
+        :local outMsg (" Log:"."\n");
         :local startBuf [:toarray [/log find]];
         :local tmpStartBuf;
         ## Deleting unwanted message
@@ -148,23 +175,23 @@
             :if ($topic~"account" or $message~"script|changed by|added by|removed by") do={:put ""} else={:set tmpStartBuf ($tmpStartBuf, $n)}; 
         }
         :set startBuf $tmpStartBuf;
-        :if ([:len $startBuf]=0) do={$SendMsg (" Log: items not found."); return [];};
+        :if ([:len $startBuf]=0) do={:return (" Log: items not found.");};
         :local start 0;
         :local end ([:len $startBuf] -1);
         ## Options
-        :if ([:typeof $option]="nothing" || $option~"all|head|tail|find|time") do={:put ""} else={$SendMsg (" Log: "."option \"$option\""." - not recognized, try again..."); return [];}; 
+        :if ([:typeof $option]="nothing" || $option~"all|head|tail|find|time") do={:put ""} else={:return (" Log: "."option \"$option\""." - not recognized, try again...");}; 
         ## Line Numbers
-        :if ([:typeof $lineNum]="nothing" || $option~"find" || $option~"time" || $lineNum~"[1-9]") do={:put ""} else={$SendMsg (" Log: "."\"$lineNum\""." - not allowed numbers, try again..."); return [];}; 
+        :if ([:typeof $lineNum]="nothing" || $option~"find" || $option~"time" || $lineNum~"[1-9]") do={:put ""} else={:return (" Log: "."\"$lineNum\""." - not allowed numbers, try again...");}; 
         ## FIND
         :if ($option = "find") do={
-            :if ([:len $lineNum] < 3) do={$SendMsg (" Log: find requires at least 3 symbols."); return [];};
+            :if ([:len $lineNum] < 3) do={:return (" Log: find requires at least 3 symbols.");};
             :set tmpStartBuf ({});
             :set lineNum [$fsLowStr $lineNum];
             :foreach n in=$startBuf do={
                 :set message [$fsLowStr [/log get $n message]];
                 :if ($message~$lineNum) do={:set tmpStartBuf ($tmpStartBuf, $n);}; 
             }
-            :if ([:len $tmpStartBuf] = 0) do={$SendMsg (" Log: search \"$lineNum\" not found."); return [];};
+            :if ([:len $tmpStartBuf] = 0) do={:return (" Log: search \"$lineNum\" not found.");};
             :set startBuf $tmpStartBuf;
             :set end ([:len $startBuf] -1);   
         };
@@ -183,7 +210,7 @@
         ## TIME
         :if ($option = "time") do={
             :if ([:typeof $lineNum]="nothing") do={:set $lineNum 1};
-            :if (([:len $lineNum] > 0) && $lineNum~"[1-9]") do={:put ""} else={$SendMsg (" Log: time requires only numbers, try again..."); return [];}; 
+            :if (([:len $lineNum] > 0) && $lineNum~"[1-9]") do={:put ""} else={:return (" Log: time requires only numbers, try again...");}; 
             :local curDate [/system clock get date];
             :local curTime [/system clock get time];
             :local curEpochTime [$EpochTime ($curDate." ".$curTime)];
@@ -193,7 +220,7 @@
             :local lastLineEpochTime [$EpochTime [/log get [:pick $startBuf ($lenStartBuf -1)] time]];
             :local outOfLog false;
             :if ($printEpochTime < $firstLineEpochTime) do={:set outOfLog true};
-            :if ($lastLineEpochTime < $printEpochTime) do={$SendMsg (" Log: items in $lineNum"."hr not found."); return [];};
+            :if ($lastLineEpochTime < $printEpochTime) do={:return (" Log: items in $lineNum"."hr not found.");};
             :if (!$outOfLog) do={
                 :local count 0;
                 :set start -1;
@@ -209,24 +236,12 @@
             :set time [/log get [:pick $startBuf $n] time];
             :set outMsg ($outMsg."> ".$time.": ".$message."\n");
         }
-        :set $outMsg [$CP1251toUTF8 $outMsg];
-        :if ([:len $outMsg] > 4096) do={
-            :local cnt 1;
-            :local logPart ([:len $outMsg] / 4096 + 1);
-            while ([:len $outMsg] > 0) do={
-                :set outMsg (" Log ($cnt of $logPart):"."%0A".$outMsg);
-                :if ([:len $outMsg] > 4096) do={
-                    $SendMsg [:pick $outMsg 0 4096];
-                    :set $outMsg [:pick $outMsg 4096 [:len $outMsg]];
-                } else={$SendMsg $outMsg; :set $outMsg "";};
-                :set cnt ($cnt +1);
-            }
-        } else={$SendMsg (" Log: "."%0A".$outMsg)};
-    } on-error={$SendMsg " Log: something went wrong, try again..."};
+        :return [$CP1251toUTF8 $outMsg];
+    } on-error={:return " Log: something went wrong, try again..."};
 }
 :local action $0;
 :if ($action = "help" || $action = "Help") do={$SendMsg [$Help]; :return [];};
-:if ($action = "print") do={$PrintLog $1 $2; :return [];};
+:if ($action = "print") do={$SendMsg [$PrintLog $1 $2]; :return [];};
 :if ($action = "reset") do={$SendMsg [$ResetLog]; :return [];};
 :if ($action = "set")   do={$SendMsg [$SetLog $1]; :return [];};
 $SendMsg [$Help];
