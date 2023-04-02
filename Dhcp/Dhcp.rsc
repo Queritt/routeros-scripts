@@ -1,7 +1,7 @@
 ## Dhcp
-## 0.14
-## add split message by string
-## 2023/04/01
+## 0.15
+## Increase code speed
+## 2023/04/02
 
 :local SendMsg do={
     :if ([:len $1] != 0) do={
@@ -12,13 +12,16 @@
         :local tmpChar;
         :local maxLength (4096 - [:len ("/$nameID ")] - [:len ("(message 99 of 99):"."%0A")]);
         :local foundChar;
+        :local counter;
         :if ([:len ("/$nameID:"."%0A"."$outMsg")] > 4096) do={
             :while ([:len $outMsg] > 0) do={
                 :if ([:len $outMsg] > $maxLength) do={
                     :set foundChar -1;
-                    :for n from=0 to=($maxLength -3) do={
-                        :set tmpChar [:pick $outMsg $n ($n +3)];
-                        :if ($tmpChar = "%0A" and (($n +2) < $maxLength)) do={:set foundChar $n; :set n ($n +3);};
+                    :set counter ($maxLength -3);
+                    :while ($foundChar = -1 and $counter > -1) do={
+                        :set tmpChar [:pick $outMsg $counter ($counter +3)];
+                        :if ($tmpChar = "%0A") do={:set foundChar $counter;};
+                        :set counter ($counter -1);
                     }
                     :if ($foundChar > -1) do={
                         :set outMsgSplit ($outMsgSplit, [:pick $outMsg 0 ($foundChar +3)]);
@@ -31,7 +34,8 @@
             }
         } else={:set outMsgSplit {$outMsg}};
         :set logPart [:len $outMsgSplit];
-        :for n from=0 to=([:len $outMsgSplit] -1) do={[[:parse [/system script get TG source]] \
+        :for n from=0 to=([:len $outMsgSplit] -1) do={
+            [[:parse [/system script get TG source]] \
             Text=("/$nameID "."(message ".($n+1)." of $logPart):"."%0A".[:pick $outMsgSplit $n])]; delay 2s;};
     }
 }
