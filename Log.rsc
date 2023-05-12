@@ -1,14 +1,14 @@
 ## Log
-## 0.17
-## 2023/04/02
-## Increase code speed
+## 0.18
+## 2023/05/11
+## Fix past log time 
 
 :local SendMsg do={
     :if ([:len $1] != 0) do={
         :local nameID [/system identity get name;];
         :local outMsg $1;
         :local outMsgSplit;
-        :local logPart
+        :local logPart;
         :local tmpChar;
         :local maxLength (4096 - [:len ("/$nameID ")] - [:len ("(message 99 of 99):"."%0A")]);
         :local foundChar;
@@ -136,17 +136,15 @@
 
     :local EpochTime do={
         :local ds $1;
-        :local ts $2;
+        :local ts;
         :local curDate [/system clock get date];
-        :local curYear [:pick $curDate 8 ([:len $curDate]-1)];
-        :if ([:len $1]>19) do={:set ds "$[:pick $1 0 11]"; :set ts [:pick $1 12 20]};
-        :if ([:len $1]>8 && [:len $1]<20) do={:set ds "$[:pick $1 0 6]/$curYear"; :set ts [:pick $1 7 15]};
-        :local yesterday false;
-        :if ([:len $1]=8) do={
-            :if ([:totime $1]>ts) do={:set yesterday (true)};
-            :set ds $curDate;
-            :set ts $1;
-        }
+        :local curYear [:pick $curDate 7 [:len $curDate]];
+        ## Case date(mon/day/year) + time
+        :if ([:len $1]>19) do={:set ds "$[:pick $1 0 11]"; :set ts [:pick $1 12 20];};
+        ## Case date(mon/day) + time
+        :if ([:len $1]>8 && [:len $1]<20) do={:set ds "$[:pick $1 0 6]/$curYear"; :set ts [:pick $1 7 15];};
+        ## Case time
+        :if ([:len $1]=8) do={:set ds $curDate; :set ts $1;};
         :local months;
         :if ((([:pick $ds 9 11]-1)/4)!=(([:pick $ds 9 11])/4)) do={
             :set months {"an"=0;"eb"=31;"ar"=60;"pr"=91;"ay"=121;"un"=152;"ul"=182;"ug"=213;"ep"=244;"ct"=274;"ov"=305;"ec"=335};
@@ -155,7 +153,6 @@
         }
         :set ds (([:pick $ds 9 11]*365)+(([:pick $ds 9 11]-1)/4)+($months->[:pick $ds 1 3])+[:pick $ds 4 6]);
         :set ts (([:pick $ts 0 2]*3600)+([:pick $ts 3 5]*60)+[:pick $ts 6 8]);
-        :if (yesterday) do={:set ds ($ds-1)};
         :return ($ds*86400+$ts+946684800-[/system clock get gmt-offset]);
     }  
 
