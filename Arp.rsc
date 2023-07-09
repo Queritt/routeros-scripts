@@ -1,7 +1,7 @@
 ## Arp
-## 0.15
-## Increase code speed
-## 2023/04/02
+## 0.16
+## Returned help function
+## 2023/07/09
 
 :local SendMsg do={
     :if ([:len $1] != 0) do={
@@ -38,6 +38,14 @@
             [[:parse [/system script get TG source]] \
             Text=("/$nameID "."(message ".($n+1)." of $logPart):"."%0A".[:pick $outMsgSplit $n])]; delay 2s;};
     }
+}
+
+:local Help do={
+    :local help (" Arp option: "."%0A". \
+    "  > print [all, dynamic, static,"."%0A". \
+    "   ip, mac, interface]"."%0A". \
+    "  > remove [dynamic, ip, mac]");
+    :return $help;
 }
 
 # Function of converting CP1251 to UTF8
@@ -139,4 +147,4 @@
 :if ($0 = "help" || $0 = "Help") do={$SendMsg [$Help]; :return [];};
 :if ($0 = "print") do={$SendMsg [$CP1251toUTF8 [$PrintArp $1]]; return [];};
 :if ($0 = "remove") do={$SendMsg [$CP1251toUTF8 [$RemoveArp $1]]; return [];};
-$SendMsg [$Help];
+$SendMsg [$Help]; 
